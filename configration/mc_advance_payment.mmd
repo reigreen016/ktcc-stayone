@@ -1,0 +1,52 @@
+sequenceDiagram
+    autonumber
+
+    participant GuestApp as ゲストアプリ
+    participant HostApp as ホストアプリ
+    participant APIGW as API Gateway
+    participant OpSoft as 運営のソフトウェア
+    participant LogDB as 記録DB
+    participant PolicyDB as ポリシーDB
+    participant JPYC as JPYCネットワーク&ウォレット
+
+    %% === 1. ゲストが予約リクエストを送信 ===
+    GuestApp->>APIGW: 宿泊予約リクエスト送信(希望日程・人数など)
+    APIGW->>OpSoft: 予約リクエスト作成
+    OpSoft->>LogDB: 予約レコード保存(ステータス=リクエスト中)
+    OpSoft-->>APIGW: リクエスト受付結果
+    APIGW-->>GuestApp: 「ホスト承認待ち」と表示
+    APIGW-->>HostApp: 新規予約リクエスト通知
+
+    %% === 2. ホストが承認 or 拒否を選択 ===
+    alt ホストが予約リクエストを承認
+        HostApp->>APIGW: リクエスト承認
+        APIGW->>OpSoft: 承認イベント通知
+        OpSoft->>LogDB: ステータス=承認済みに更新
+
+        %% --- ポリシーに基づき事前決済金額を算出 ---
+        OpSoft->>PolicyDB: 手数料率・事前決済ポリシー取得
+        PolicyDB-->>OpSoft: ポリシー情報(宿泊料金・手数料計算ルール)
+        OpSoft->>LogDB: 決済金額・手数料見込み額を記録
+        OpSoft-->>APIGW: ゲストが支払うべき金額＋ホストWallet情報
+        APIGW-->>GuestApp: 「予約承認されました。<br/>この金額をホストWalletへJPYCで支払ってください」
+
+        %% === 3. ゲストによる事前決済 ===
+        GuestApp->>JPYC: ゲストWallet→ホストWallet JPYC送金指示
+        JPYC-->>JPYC: トランザクション承認・ブロックチェーンに記録
+
+        %% JPYC側から支払い完了通知（Webhook等）
+        JPYC-->>APIGW: 支払い完了通知(Webhook)
+        APIGW->>OpSoft: 事前決済完了イベント
+        OpSoft->>LogDB: ステータス=支払済み に更新
+        OpSoft-->>APIGW: 更新結果
+
+        APIGW-->>GuestApp: 「事前決済完了」ステータス表示
+        APIGW-->>HostApp: 「ゲスト支払済み」通知
+    else ホストが予約リクエストを拒否
+        HostApp->>APIGW: リクエスト拒否
+        APIGW->>OpSoft: 拒否イベント通知
+        OpSoft->>LogDB: ステータス=拒否 に更新
+        OpSoft-->>APIGW: 更新結果
+        APIGW-->>GuestApp: 「ホストにより予約が拒否されました」と表示
+        Note over GuestApp,JPYC: 拒否の場合は事前決済フローには進まず、<br/>JPYC送金も一切発生しない
+    end
