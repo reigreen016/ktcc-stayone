@@ -1,16 +1,12 @@
 graph LR
-    %% レイアウト方向
-    %% LR = 左→右
-    %% Web2レイヤ と Web3レイヤ が一目で分かるように分割
-
     %% ===== ユーザー側（フロント） =====
-    subgraph U[ユーザー側（フロント）]
+    subgraph U["ユーザー側（フロント）"]
         G[ゲストアプリ]
         H[ホストアプリ]
     end
 
     %% ===== Web2バックエンド =====
-    subgraph B2[Web2 バックエンド]
+    subgraph B2["Web2 バックエンド"]
         APIGW["API Gateway\n＋ Auth Service"]
         BK[Booking SVC]
         DB[(Booking DB)]
@@ -18,38 +14,36 @@ graph LR
     end
 
     %% ===== Web3 決済レイヤ =====
-    subgraph W3L[Web3 決済レイヤ]
+    subgraph W3L["Web3 決済レイヤ"]
         W3["Escrowスマートコントラクト\n(Web3 Service)"]
         BC["Polygonチェーン\n(ERC-20 / USDC)"]
         AUD["On-chain Audit Log\nTxハッシュ"]
     end
 
     %% ===== 決済インフラ（オフチェーン） =====
-    subgraph P2[決済インフラ]
+    subgraph P2["決済インフラ"]
         PSP["PSP / クレカ決済"]
         HostBank["(ホスト口座)"]
     end
 
-    %% --- 通常の予約フロー（Web2） ---
+    %% --- 接続ライン ---
     G --> APIGW
     H --> APIGW
     APIGW --> BK
     BK --> DB
-
-    %% --- 決済フロー入口 ---
     BK --> PO
 
-    %% --- Web2 → Web3 決済の連携 ---
-    PO --> PSP      %% クレカオーソリ・決済
-    PO --> W3        %% Escrow作成/解放要求
+    %% 決済フロー
+    PO --> PSP
+    PO --> W3
 
-    %% --- Web3 内部 ---
-    W3 --> BC       %% Polygon上でTx実行
-    BC --> AUD      %% TxハッシュをAudit Logとして参照
+    %% Web3内部
+    W3 --> BC
+    BC --> AUD
 
-    %% --- ホストへの支払い ---
-    PO --> HostBank %% PSP経由でホストへ送金（オフチェーン）
+    %% ホスト送金
+    PO --> HostBank
 
-    %% 注釈：Web3は決済部分のみに限定利用
+    %% スタイル指定
     classDef web3 fill:#e3f6ff,stroke:#0077aa,stroke-width:1.5px;
     class W3L,W3,BC,AUD web3;
