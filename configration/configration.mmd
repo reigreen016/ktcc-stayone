@@ -11,7 +11,7 @@ graph LR
 
     %% ===== Web2バックエンド =====
     subgraph B2[Web2 バックエンド]
-        APIGW[API Gateway\n＋ Auth Service]
+        APIGW["API Gateway\n＋ Auth Service"]
         BK[Booking SVC]
         DB[(Booking DB)]
         PO[Payment Orchestrator]
@@ -19,15 +19,15 @@ graph LR
 
     %% ===== Web3 決済レイヤ =====
     subgraph W3L[Web3 決済レイヤ]
-        W3[Escrowスマートコントラクト\n(Web3 Service)]
-        BC[Polygonチェーン\n(ERC-20 / USDC)]
-        AUD[(On-chain Audit Log\nTxハッシュ)]
+        W3["Escrowスマートコントラクト\n(Web3 Service)"]
+        BC["Polygonチェーン\n(ERC-20 / USDC)"]
+        AUD["On-chain Audit Log\nTxハッシュ"]
     end
 
     %% ===== 決済インフラ（オフチェーン） =====
     subgraph P2[決済インフラ]
-        PSP[PSP / クレカ決済]
-        HostBank[(ホスト口座)]
+        PSP["PSP / クレカ決済"]
+        HostBank["(ホスト口座)"]
     end
 
     %% --- 通常の予約フロー（Web2） ---
@@ -41,7 +41,7 @@ graph LR
 
     %% --- Web2 → Web3 決済の連携 ---
     PO --> PSP      %% クレカオーソリ・決済
-    PO --> W3       %% Escrow作成/解放要求
+    PO --> W3        %% Escrow作成/解放要求
 
     %% --- Web3 内部 ---
     W3 --> BC       %% Polygon上でTx実行
