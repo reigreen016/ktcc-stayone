@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stay One | ホストページ</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Helvetica", "Arial", sans-serif;
+      background-color: #f7f7f7;
+    }
+
+    /* ===== ヘッダー ===== */
+    header {
+      background-color: #00897b;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      font-size: 18px;
+    }
+
+    header a {
+      color: white;
+      text-decoration: none;
+      font-size: 15px;
+    }
+
+    /* ===== メインレイアウト ===== */
+    .main {
+      max-width: 900px;
+      margin: 40px auto 80px;
+      padding: 0 16px;
+    }
+
+    .page-title {
+      font-size: 24px;
+      margin-bottom: 16px;
+      color: #333;
+      text-align: left;
+    }
+
+    /* ===== タブ ===== */
+    .tab-bar {
+      display: flex;
+      border-bottom: 2px solid #e0e0e0;
+      margin-bottom: 20px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+
+    .tab-button {
+      border: none;
+      background: transparent;
+      padding: 10px 18px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #555;
+      border-bottom: 3px solid transparent;
+    }
+
+    .tab-button.active {
+      color: #00897b;
+      font-weight: bold;
+      border-bottom-color: #00897b;
+    }
+
+    /* ===== タブの中身 ===== */
+    .tab-content {
+      display: none;
+      background: #ffffff;
+      padding: 20px 20px 24px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.08);
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .section-title {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #333;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .small-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .small-row .form-group {
+      flex: 1;
+    }
+
+    .primary-btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #00897b;
+      color: #fff;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+
+    .primary-btn:hover {
+      background-color: #00796b;
+    }
+
+    .msg-list {
+      border-top: 1px solid #eee;
+      margin-top: 12px;
+      padding-top: 12px;
+      font-size: 14px;
+      color: #555;
+    }
+
+    .msg-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .msg-item span {
+      display: block;
+    }
+
+    .msg-name {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+
+    .msg-snippet {
+      color: #666;
+    }
+
+    /* ===== フッター ===== */
+    footer {
+      background-color: #9e9e9e;
+      color: white;
+      padding: 10px 20px;
+      font-size: 12px;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      display: flex;
+      gap: 15px;
+    }
+
+    footer a {
+      color: white;
+      text-decoration: none;
+      font-size: 12px;
+    }
+
+      .profile-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  padding: 16px 18px 18px;
+  margin-bottom: 16px;
+}
+
+.profile-card-title {
+  font-size: 16px;
+  margin: 0 0 12px;
+  color: #333;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 16px;
+}
+
+.helper-text {
+  font-size: 12px;
+  color: #999;
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* 認証バッジ */
+.badge-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.badge-check {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #cfd8dc;
+  background-color: #f5fafa;
+  cursor: pointer;
+}
+
+.badge-check input {
+  margin-right: 4px;
+}
+
+/* 対応言語 */
+.lang-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chip-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid #cfd8dc;
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
+.lang-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px 16px;
+  font-size: 13px;
+}
+
+.lang-item input {
+  margin-right: 4px;
+}
+
+/* 英語スキル */
+.required {
+  color: #e53935;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.radio-line input {
+  margin-right: 6px;
+}
+
+.message-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  height: 460px; /* 必要に応じて調整 */
+}
+
+/* スレッド一覧 */
+.thread-list {
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.thread-search {
+  padding: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.thread-search input {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid #cfd8dc;
+  box-sizing: border-box;
+}
+
+.thread-item {
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  font-size: 13px;
+  position: relative;
+}
+
+.thread-item:last-child {
+  border-bottom: none;
+}
+
+.thread-item:hover {
+  background-color: #f5fafa;
+}
+
+.thread-item.active {
+  background-color: #e0f2f1;
+}
+
+.thread-name {
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: #333;
+}
+
+.thread-snippet {
+  color: #666;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thread-meta {
+  margin-top: 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #999;
+}
+
+.thread-unread {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background-color: #ff7043;
+  color: #fff;
+  text-align: center;
+  line-height: 18px;
+  font-size: 11px;
+}
+
+/* チャットエリア */
+.chat-area {
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-user-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.chat-user-tag {
+  font-size: 12px;
+  color: #777;
+}
+
+.chat-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid #cfd8dc;
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
+.chat-action-btn:hover {
+  background-color: #f5f5f5;
+}
+
+/* メッセージ表示部分 */
+.chat-body {
+  flex: 1;
+  padding: 10px 12px 12px;
+  overflow-y: auto;
+  background-color: #fafafa;
+}
+
+.chat-date-divider {
+  text-align: center;
+  font-size: 11px;
+  color: #999;
+  margin: 6px 0 10px;
+}
+
+.chat-row {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.me-row {
+  justify-content: flex-end;
+}
+
+.chat-bubble {
+  max-width: 80%;
+  padding: 8px 10px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat-bubble.other {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-bottom-left-radius: 2px;
+}
+
+.chat-bubble.me {
+  background-color: #00897b;
+  color: #ffffff;
+  border-bottom-right-radius: 2px;
+}
+
+/* 入力欄 */
+.chat-input-area {
+  border-top: 1px solid #e0e0e0;
+  padding: 8px 10px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.chat-input {
+  flex: 1;
+  min-height: 46px;
+  max-height: 90px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #cfd8dc;
+  font-size: 13px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.chat-send-btn {
+  white-space: nowrap;
+  padding-inline: 16px;
+}
+
+/* カレンダー */
+.calendar-wrap {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.cal-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.cal-nav {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #cfd8dc;
+  background: #fff;
+  cursor: pointer;
+}
+
+.cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 8px 10px;
+  gap: 6px;
+  color: #777;
+  font-size: 12px;
+}
+
+.cal-week div { text-align: center; }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+.cal-day {
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cal-day:hover {
+  background: #f5fafa;
+}
+
+.cal-day.muted {
+  color: #bbb;
+  border-color: #f0f0f0;
+  background: #fafafa;
+}
+
+.cal-day.disabled {
+  cursor: default;
+}
+
+.cal-day.today {
+  border-color: #00897b;
+}
+
+.cal-day.selected {
+  background: #00897b;
+  color: #fff;
+  border-color: #00897b;
+}
+
+.cal-footer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #eee;
+}
+
+.selected-dates {
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: #fafafa;
+  min-height: 44px;
+}
+
+.date-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e0f2f1;
+  border: 1px solid #b2dfdb;
+  font-size: 12px;
+  color: #00695c;
+  margin: 3px 4px 0 0;
+}
+
+
+  </style>
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header>
+    <div>Stay One</div>
+    <a href="login.html">ログイン</a>
+  </header>
+
+  <!-- メイン -->
+  <main class="main">
+    <div class="page-title">ホストマイページ</div>
+
+    <!-- タブバー -->
+    <div class="tab-bar">
+      <button class="tab-button active" data-tab="profile">プロフィール入力</button>
+      <button class="tab-button" data-tab="property">物件情報入力</button>
+      <button class="tab-button" data-tab="message">メッセージ</button>
+    </div>
+
+    <!-- ▼ プロフィール入力タブ ▼ -->
+    <section id="profile" class="tab-content active">
+  <div class="section-title">プロフィール入力</div>
+
+  <!-- 基本情報 -->
+  <div class="profile-card">
+    <h3 class="profile-card-title">基本情報</h3>
+
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label>ニックネーム(公開用)</label>
+        <input type="text" placeholder="例）たろう">
+      </div>
+
+      <div class="form-group">
+        <label>所在地（市区町村）</label>
+        <input type="text" placeholder="例）大阪市中央区">
+      </div>
+
+    </div>
+
+    <div class="form-group">
+      <label>自己紹介</label>
+      <textarea placeholder="簡単な紹介（400字まで）"></textarea>
+      <div class="helper-text">0 / 400</div><!-- 動きはダミー表示でOKならこのまま -->
+    </div>
+  </div>
+
+  <!-- ホスト経歴・認証 -->
+  <div class="profile-card">
+    <h3 class="profile-card-title">ホスト経歴</h3>
+
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label>ホスト歴（年、月）</label>
+        <input type="text" placeholder="例）1年6ヶ月">
+      </div>
+
+      <div class="form-group">
+        <label>開始年</label>
+        <input type="number" placeholder="例）2025">
+      </div>
+
+      <div class="form-group">
+        <label>受入回数（延べ）</label>
+        <input type="number" placeholder="例）3">
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- 対応言語 -->
+  <div class="profile-card">
+    <h3 class="profile-card-title">対応言語</h3>
+
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label>話せる言語</label>
+        <input type="text" placeholder="例）日本語、英語、中国語など">
+      </div>
+    </div>
+  </div>
+
+  <!-- 英語スキルレベル -->
+  <div class="profile-card">
+    <h3 class="profile-card-title">
+      英語スキルレベル <span class="required">＊</span>
+    </h3>
+
+    <div class="radio-group">
+      <label class="radio-line">
+        <input type="radio" name="english_level" value="none" />
+        ほぼ話せない（翻訳アプリ必須）
+      </label>
+      <label class="radio-line">
+        <input type="radio" name="english_level" value="easy" />
+        簡単な単語・ジェスチャーならOK
+      </label>
+      <label class="radio-line">
+        <input type="radio" name="english_level" value="daily" />
+        日常会話レベル
+      </label>
+      <label class="radio-line">
+        <input type="radio" name="english_level" value="business" />
+        ビジネスレベル
+      </label>
+      <label class="radio-line">
+        <input type="radio" name="english_level" value="native" />
+        ネイティブレベル
+      </label>
+      <label class="radio-line">
+        <input type="radio" name="english_level" value="other" />
+        その他
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label>「その他」を選んだ方</label>
+      <input type="text" placeholder="例）TOEIC◯◯点、留学経験あり など">
+    </div>
+  </div>
+
+  <button class="primary-btn">プロフィールを保存</button>
+</section>
+
+
+    <!-- ▼ 物件情報入力タブ ▼ -->
+    <section id="property" class="tab-content">
+  <div class="section-title">物件情報入力</div>
+
+  <div class="profile-card">
+    <h3 class="profile-card-title">基本情報</h3>
+
+    <div class="form-group">
+      <label>物件タイトル</label>
+      <input type="text" placeholder="例：京都・町家の静かな一室">
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label>住所（ゲストには市区町村まで表示）</label>
+        <input type="text" placeholder="例：京都市東山区">
+      </div>
+      <div class="form-group">
+        <label>最寄駅 / バス</label>
+        <input type="text" placeholder="例：〇〇駅 徒歩6分">
+      </div>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label>宿泊料金（1泊あたり）</label>
+        <input type="number" placeholder="例：6000">
+      </div>
+      <div class="form-group">
+        <label>最大宿泊人数</label>
+        <input type="number" placeholder="例：2">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>設備・特徴</label>
+      <textarea placeholder="例：Wi-Fi、エアコン、朝食付き…"></textarea>
+    </div>
+  </div>
+
+  <!-- 受け入れ可能日（複数選択カレンダー） -->
+  <div class="profile-card">
+    <h3 class="profile-card-title">受け入れ可能日（複数選択）</h3>
+
+    <div class="calendar-wrap" id="availabilityCalendar">
+      <div class="cal-header">
+        <button type="button" class="cal-nav" data-cal="prev">‹</button>
+        <div class="cal-title" data-cal="title">2025年 12月</div>
+        <button type="button" class="cal-nav" data-cal="next">›</button>
+      </div>
+
+      <div class="cal-week">
+        <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
+      </div>
+
+      <div class="cal-grid" data-cal="grid"></div>
+
+      <div class="cal-footer">
+        <button type="button" class="chip-btn" data-cal="clear">選択を全解除</button>
+        <button type="button" class="chip-btn" data-cal="today">今月へ戻る</button>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:12px;">
+      <label>選択中の日付</label>
+      <div class="selected-dates" data-cal="selectedList">未選択</div>
+
+      <!-- 送信用（カンマ区切り YYYY-MM-DD） -->
+      <input type="hidden" name="available_dates" data-cal="hidden" value="">
+      <small style="font-size:12px; color:#777;">
+        ※ クリックで選択／もう一度クリックで解除できます。
+      </small>
+    </div>
+  </div>
+
+  <button class="primary-btn">物件情報を保存</button>
+</section>
+
+<!-- 物件タブ用：複数日カレンダーのJS（このタブ内に置いてOK） -->
+<script>
+(() => {
+  const root = document.getElementById("availabilityCalendar");
+  if (!root) return;
+
+  const titleEl = root.querySelector('[data-cal="title"]');
+  const gridEl  = root.querySelector('[data-cal="grid"]');
+  const listEl  = root.querySelector('[data-cal="selectedList"]');
+  const hiddenEl= root.querySelector('[data-cal="hidden"]');
+
+  // 選択日を保持（YYYY-MM-DD）
+  const selected = new Set();
+
+  // 表示中の年月
+  const today = new Date();
+  let viewYear  = today.getFullYear();
+  let viewMonth = today.getMonth(); // 0-11
+
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const toKey = (y, m, d) => `${y}-${pad2(m+1)}-${pad2(d)}`;
+
+  function render() {
+    // タイトル
+    titleEl.textContent = `${viewYear}年 ${viewMonth + 1}月`;
+
+    // グリッド作成
+    gridEl.innerHTML = "";
+
+    const first = new Date(viewYear, viewMonth, 1);
+    const last  = new Date(viewYear, viewMonth + 1, 0);
+    const startDow = first.getDay(); // 0:Sun
+    const daysInMonth = last.getDate();
+
+    // 前月の埋め
+    const prevLast = new Date(viewYear, viewMonth, 0).getDate();
+    for (let i = 0; i < startDow; i++) {
+      const d = prevLast - (startDow - 1 - i);
+      const cell = makeCell({ label: d, muted: true, disabled: true });
+      gridEl.appendChild(cell);
+    }
+
+    // 当月
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = toKey(viewYear, viewMonth, d);
+      const isToday =
+        viewYear === today.getFullYear() &&
+        viewMonth === today.getMonth() &&
+        d === today.getDate();
+
+      const cell = makeCell({
+        label: d,
+        key,
+        selected: selected.has(key),
+        today: isToday
+      });
+
+      gridEl.appendChild(cell);
+    }
+
+    // 次月の埋め（42マスになるように）
+    const totalCells = gridEl.children.length;
+    const remain = (totalCells <= 35) ? (35 - totalCells) : (42 - totalCells);
+    for (let i = 1; i <= remain; i++) {
+      const cell = makeCell({ label: i, muted: true, disabled: true });
+      gridEl.appendChild(cell);
+    }
+
+    renderSelectedList();
+  }
+
+  function makeCell({ label, key, selected: isSel, today: isToday, muted=false, disabled=false }) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cal-day";
+    btn.textContent = label;
+
+    if (muted) btn.classList.add("muted");
+    if (disabled) btn.classList.add("disabled");
+    if (isSel) btn.classList.add("selected");
+    if (isToday) btn.classList.add("today");
+
+    if (!disabled && key) {
+      btn.addEventListener("click", () => {
+        if (selected.has(key)) selected.delete(key);
+        else selected.add(key);
+        render(); // 再描画（選択色反映）
+      });
+    }
+    return btn;
+  }
+
+  function renderSelectedList() {
+    const arr = Array.from(selected).sort();
+    hiddenEl.value = arr.join(",");
+    if (arr.length === 0) {
+      listEl.textContent = "未選択";
+      return;
+    }
+    // 見た目用（YYYY/MM/DD）
+    listEl.innerHTML = arr.map(s => {
+      const pretty = s.replaceAll("-", "/");
+      return `<span class="date-chip">${pretty}</span>`;
+    }).join(" ");
+  }
+
+  // ナビゲーション
+  root.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+
+    const action = t.getAttribute("data-cal");
+    if (!action) return;
+
+    if (action === "prev") {
+      viewMonth -= 1;
+      if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+      render();
+    }
+    if (action === "next") {
+      viewMonth += 1;
+      if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+      render();
+    }
+    if (action === "clear") {
+      selected.clear();
+      render();
+    }
+    if (action === "today") {
+      viewYear = today.getFullYear();
+      viewMonth = today.getMonth();
+      render();
+    }
+  });
+
+  render();
+})();
+</script>
+
+
+    <!-- ▼ メッセージタブ ▼ -->
+    <section id="message" class="tab-content">
+  <div class="section-title">メッセージ</div>
+
+  <div class="message-layout">
+    <!-- 左：スレッド一覧 -->
+    <aside class="thread-list">
+      <div class="thread-search">
+        <input type="text" placeholder="ユーザーを検索" />
+      </div>
+
+      <div class="thread-item active">
+        <div class="thread-name">John（アメリカ）</div>
+        <div class="thread-snippet">3月に1週間滞在を検討しています…</div>
+        <div class="thread-meta">
+          <span class="thread-time">昨日</span>
+          <span class="thread-unread">3</span>
+        </div>
+      </div>
+
+      <div class="thread-item">
+        <div class="thread-name">Li Hua（中国）</div>
+        <div class="thread-snippet">日本の家庭料理を一緒に作ってみたいのですが…</div>
+        <div class="thread-meta">
+          <span class="thread-time">2日前</span>
+        </div>
+      </div>
+
+      <div class="thread-item">
+        <div class="thread-name">Emma（イギリス）</div>
+        <div class="thread-snippet">最寄りの観光地について教えてください。</div>
+        <div class="thread-meta">
+          <span class="thread-time">1週間前</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 右：選択中のチャット画面 -->
+    <div class="chat-area">
+      <header class="chat-header">
+        <div class="chat-user">
+          <div class="chat-user-name">John（アメリカ）</div>
+          <div class="chat-user-tag">3月1日〜3月7日／2名</div>
+        </div>
+        <div class="chat-actions">
+          <button type="button" class="chat-action-btn">プロフィールを見る</button>
+          <button type="button" class="chat-action-btn">予約詳細</button>
+        </div>
+      </header>
+
+      <div class="chat-body">
+        <!-- 日付区切り -->
+        <div class="chat-date-divider">昨日</div>
+
+        <!-- 相手からのメッセージ -->
+        <div class="chat-row">
+          <div class="chat-bubble other">
+            こんにちは！3月に1週間滞在を検討しています。<br />
+            最寄り駅からのアクセスについて教えていただけますか？
+          </div>
+        </div>
+
+        <!-- 自分のメッセージ -->
+        <div class="chat-row me-row">
+          <div class="chat-bubble me">
+            ご連絡ありがとうございます！最寄りの〇〇駅から徒歩6分です。<br />
+            バスの場合は△△停留所から徒歩3分ほどになります。
+          </div>
+        </div>
+
+        <div class="chat-row">
+          <div class="chat-bubble other">
+            ありがとうございます！<br />
+            夜遅い時間のチェックインも可能でしょうか？
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+  </main>
+
+  <!-- フッター -->
+  <footer>
+    <a href="#">お問い合わせ</a>
+    <a href="#">利用規約</a>
+    <a href="#">プライバシーポリシー</a>
+  </footer>
+
+  <!-- タブ切り替え用スクリプト -->
+  <script>
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const targetId = button.getAttribute('data-tab');
+
+        // ボタンの active を切り替え
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+
+        // コンテンツの active を切り替え
+        tabContents.forEach(content => {
+          if (content.id === targetId) {
+            content.classList.add('active');
+          } else {
+            content.classList.remove('active');
+          }
+        });
+      });
+    });
+  </script>
+
+</body>
+</html>
