@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>StayOne | Guest Profile</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Helvetica, Arial, sans-serif;
+      background: #f7f7f7;
+    }
+    header {
+      background: #00897b;
+      color: #fff;
+      padding: 14px 20px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    main {
+      max-width: 900px;
+      margin: 30px auto 80px;
+      padding: 0 16px;
+    }
+    h2 {
+      font-size: 22px;
+      margin-bottom: 16px;
+      color: #333;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e0e0e0;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    .card-title {
+      font-size: 16px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px 18px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: #333;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+    .avatar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .avatar-preview {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px dashed #b2dfdb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #777;
+      background: #f0f9f8;
+    }
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 14px;
+    }
+    .radio-group label {
+      font-weight: normal;
+    }
+    .primary-btn {
+      margin-top: 16px;
+      padding: 12px 24px;
+      font-size: 15px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: #00897b;
+      color: #fff;
+    }
+    .primary-btn:hover {
+      background: #00796b;
+    }
+    /* Language Skills */
+.lang-skill {
+  margin-bottom: 18px;
+}
+
+.lang-label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.lang-sub {
+  font-size: 12px;
+  font-weight: normal;
+  color: #777;
+  margin-left: 6px;
+}
+
+/* 横並びレベル選択 */
+.level-scale {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.level-item {
+  position: relative;
+  cursor: pointer;
+}
+
+.level-item input {
+  display: none;
+}
+
+.level-item span {
+  display: block;
+  padding: 10px 0;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid #cfd8dc;
+  background: #ffffff;
+  font-size: 13px;
+  color: #555;
+  transition: all 0.2s ease;
+}
+
+/* hover */
+.level-item:hover span {
+  background: #f5fafa;
+}
+
+/* selected */
+.level-item input:checked + span {
+  background: #00897b;
+  color: #ffffff;
+  border-color: #00897b;
+  font-weight: 600;
+}
+
+  </style>
+</head>
+<body>
+
+<header>StayOne | Guest Profile</header>
+
+<main>
+  <h2>Guest Profile Setup</h2>
+
+  <!-- Profile Photo -->
+  <div class="card">
+    <div class="card-title">Profile Photo</div>
+    <div class="avatar-wrap">
+      <div class="avatar-preview">Your Photo</div>
+      <input type="file" accept="image/*" />
+    </div>
+  </div>
+
+  <!-- Basic Information (Section 2) -->
+  <div class="card">
+    <div class="card-title">Basic Information</div>
+    <div class="grid-2">
+      <div>
+        <label>First Name</label>
+        <input type="text" placeholder="John" />
+      </div>
+      <div>
+        <label>Last Name</label>
+        <input type="text" placeholder="Smith" />
+      </div>
+      <div>
+        <label>Nationality</label>
+        <input type="text" placeholder="United States" />
+      </div>
+      <div>
+        <label>Date of Birth</label>
+        <input type="date" />
+      </div>
+      <div>
+        <label>Sex</label>
+        <select>
+          <option>Male</option>
+          <option>Female</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Emergency Contact (Section 4) -->
+  <div class="card">
+    <div class="card-title">Emergency Contact</div>
+    <div class="grid-2">
+      <div>
+        <label>Name</label>
+        <input type="text" />
+      </div>
+      <div>
+        <label>Relationship</label>
+        <input type="text" />
+      </div>
+      <div>
+        <label>Phone</label>
+        <input type="tel" />
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- Language Level (Section 7) -->
+<div class="card">
+  <div class="card-title">Language Skills</div>
+
+  <!-- Japanese -->
+  <div class="lang-skill">
+    <div class="lang-label">
+      Spoken Japanese
+      <span class="lang-sub">日本語（会話）</span>
+    </div>
+
+    <div class="level-scale">
+      <label class="level-item">
+        <input type="radio" name="jp" />
+        <span>None</span>
+      </label>
+      <label class="level-item">
+        <input type="radio" name="jp" />
+        <span>Basic</span>
+      </label>
+      <label class="level-item">
+        <input type="radio" name="jp" />
+        <span>Simple</span>
+      </label>
+      <label class="level-item">
+        <input type="radio" name="jp" />
+        <span>Daily</span>
+      </label>
+      <label class="level-item">
+        <input type="radio" name="jp" />
+        <span>Fluent</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- English -->
+  <div class="lang-skill">
+    <div class="lang-label">
+      Spoken English
+      <span class="lang-sub">英語（会話）</span>
+    </div>
+
+    <div class="level-scale">
+      <label class="level-item">
+        <input type="radio" name="en" />
+        <span>None</span>
+      </label>
+      <label class="level-item">
+        <input type="radio" name="en" />
+        <span>Basic</span>
+      </label>
+      <label class="level-item">
+        <input type="radio" name="en" />
+        <span>Simple</span>
+      </label>
+      <label class="level-item">
+        <input type="radio" name="en" />
+        <span>Daily</span>
+      </label>
+      <label class="level-item">
+        <input type="radio" name="en" />
+        <span>Fluent</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+  <!-- Message to Host -->
+  <div class="card">
+    <div class="card-title">Message to Your Host</div>
+    <textarea placeholder="Please write anything you would like your host to know in advance (lifestyle, expectations, concerns, etc.)"></textarea>
+  </div>
+
+  <button class="primary-btn">Save Profile</button>
+</main>
+
+</body>
+</html>

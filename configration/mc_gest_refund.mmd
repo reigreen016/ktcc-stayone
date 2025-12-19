@@ -1,0 +1,44 @@
+sequenceDiagram
+    autonumber
+
+    participant GuestApp as ゲストアプリ
+    participant HostApp as ホストアプリ
+    participant APIGW as API Gateway
+    participant OpSoft as 運営のソフトウェア
+    participant LogDB as 記録DB
+    participant PolicyDB as ポリシーDB
+    participant JPYC as JPYCネットワーク&ウォレット
+
+    %% === 前提 ===
+    Note over GuestApp,HostApp: 予約は承認済み & 事前決済済み。<br/>JPYCはゲスト→ホストへ送金済み。<br/>ゲスト側の不手際によりキャンセル/返金が発生（返金は「あり」）。
+
+    %% === 1. ゲストがキャンセル/返金を申請 ===
+    GuestApp->>APIGW: キャンセル/返金リクエスト(予約ID, 理由=ゲスト都合)
+    APIGW->>OpSoft: キャンセル/返金処理依頼(予約ID, 理由)
+    OpSoft->>LogDB: 予約・決済状況の取得(支払額, 日程, ホストWallet, ゲストWallet)
+    LogDB-->>OpSoft: 予約/決済データ返却
+
+    %% === 2. ポリシーに従い返金額と手数料額を算出 ===
+    OpSoft->>PolicyDB: キャンセルポリシー照会(日付, ゲスト都合フラグ)
+    PolicyDB-->>OpSoft: 返金率・手数料ルール返却
+    OpSoft->>LogDB: 精算計算結果を記録(返金額X, 手数料額Y, ステータス=精算待ち)
+    OpSoft-->>APIGW: 精算指示(返金額X, 手数料額Y, 送金先Wallet情報)
+    APIGW-->>GuestApp: 返金見込み額Xを通知
+    APIGW-->>HostApp: 精算依頼通知(ゲストへX返金, 運営へY支払い)
+
+    %% === 3. ホストがJPYCで返金と手数料支払いを実行 ===
+    HostApp->>JPYC: ホストWallet→ゲストWalletへ 返金X JPYC 送金
+    JPYC-->>JPYC: 返金Tx承認・記録
+
+    HostApp->>JPYC: ホストWallet→運営Walletへ 手数料Y JPYC 送金
+    JPYC-->>JPYC: 手数料Tx承認・記録
+
+    %% === 4. 完了通知を受けて記録・ステータス更新 ===
+    JPYC-->>APIGW: 返金/手数料Tx完了通知(Webhook)
+    APIGW->>OpSoft: 精算完了イベント(予約ID, 返金TxID, 手数料TxID)
+    OpSoft->>LogDB: 最終記録(返金済み/手数料支払済み, ステータス=キャンセル完了)
+    OpSoft-->>APIGW: 更新結果
+
+    %% === 5. 両者に完了通知 ===
+    APIGW-->>GuestApp: 返金完了表示(返金X)
+    APIGW-->>HostApp: 精算完了表示(返金X・手数料Y)

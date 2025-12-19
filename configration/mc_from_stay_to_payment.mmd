@@ -1,0 +1,44 @@
+sequenceDiagram
+    autonumber
+
+    participant GuestApp as ゲストアプリ
+    participant HostApp as ホストアプリ
+    participant APIGW as API Gateway
+    participant OpSoft as 運営のソフトウェア
+    participant LogDB as 記録DB
+    participant PolicyDB as ポリシーDB
+    participant JPYC as JPYCネットワーク&ウォレット
+
+    %% === 0. 前提：承認済み & 事前決済済みで滞在開始 ===
+    Note over GuestApp,HostApp: 予約ステータス=「支払済み・滞在中」<br/>ゲストはホスト宅に滞在
+
+    %% === 1. 滞在終了（チェックアウト） ===
+    Note over GuestApp,HostApp: 滞在期間が終了し、チェックアウト
+
+    %% ホストが滞在完了を報告
+    HostApp->>APIGW: 滞在完了報告(予約ID, チェックアウト確認)
+    APIGW->>OpSoft: 滞在完了イベント(予約ID)
+    OpSoft->>LogDB: 予約ステータスを「滞在完了(手数料未払い)」に更新
+
+    %% === 2. 手数料額の算出（ポリシーに基づく） ===
+    OpSoft->>PolicyDB: 手数料ポリシー照会<br/>(宿泊料金・期間・プランなど)
+    PolicyDB-->>OpSoft: 手数料率・計算ルール返却
+    OpSoft->>LogDB: 手数料額の計算結果を記録
+    OpSoft-->>APIGW: 手数料額 & 運営Walletアドレス
+    APIGW-->>HostApp: 「滞在完了。<br/>JPYCで手数料 ◯◯JPYC を運営Walletへ送金してください」と表示
+
+    %% === 3. ホストによる手数料支払い（ホスト→運営） ===
+    HostApp->>JPYC: ホストWallet→運営Walletへ<br/>手数料分JPYC送金トランザクション指示
+    JPYC-->>JPYC: トランザクション承認・ブロックチェーンに記録
+
+    %% JPYCネットワークからシステムへの通知
+    JPYC-->>APIGW: 手数料支払い完了通知(Webhook)
+    APIGW->>OpSoft: 手数料支払い完了イベント(予約ID, TxID)
+    OpSoft->>LogDB: 手数料支払い済み & 取引完了として記録
+    OpSoft-->>APIGW: 更新結果
+
+    %% === 4. 最終ステータス反映 ===
+    APIGW-->>HostApp: 「手数料支払い完了。取引完了」表示
+    APIGW-->>GuestApp: 「滞在完了」ステータス表示<br/>（※ここでレビュー依頼なども可能）
+
+    Note over GuestApp,HostApp: このケースではトラブル・返金なしで<br/>ゲスト→ホストの支払い ＋ ホスト→運営の手数料支払いが完了

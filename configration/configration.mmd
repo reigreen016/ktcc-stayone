@@ -1,0 +1,49 @@
+graph LR
+    %% ===== ユーザー側（フロント） =====
+    subgraph U["ユーザー側（フロント）"]
+        G[ゲストアプリ]
+        H[ホストアプリ]
+    end
+
+    %% ===== Web2バックエンド =====
+    subgraph B2["Web2 バックエンド"]
+        APIGW["API Gateway\n＋ Auth Service"]
+        BK[Booking SVC]
+        DB[(Booking DB)]
+        PO[Payment Orchestrator]
+    end
+
+    %% ===== Web3 決済レイヤ =====
+    subgraph W3L["Web3 決済レイヤ"]
+        W3["Escrowスマートコントラクト\n(Web3 Service)"]
+        BC["Polygonチェーン\n(ERC-20 / USDC)"]
+        AUD["On-chain Audit Log\nTxハッシュ"]
+    end
+
+    %% ===== 決済インフラ（オフチェーン） =====
+    subgraph P2["決済インフラ"]
+        PSP["PSP / クレカ決済"]
+        HostBank["(ホスト口座)"]
+    end
+
+    %% --- 接続ライン ---
+    G --> APIGW
+    H --> APIGW
+    APIGW --> BK
+    BK --> DB
+    BK --> PO
+
+    %% 決済フロー
+    PO --> PSP
+    PO --> W3
+
+    %% Web3内部
+    W3 --> BC
+    BC --> AUD
+
+    %% ホスト送金
+    PO --> HostBank
+
+    %% スタイル指定
+    classDef web3 fill:#e3f6ff,stroke:#0077aa,stroke-width:1.5px;
+    class W3L,W3,BC,AUD web3;

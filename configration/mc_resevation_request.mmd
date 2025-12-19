@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant GuestApp as ゲストアプリ
+    participant HostApp as ホストアプリ
+    participant APIGW as API Gateway
+    participant Auth as Auth Service
+    participant Booking as Booking SVC
+    participant DB as DB
+
+    rect rgba(255, 230, 160, 0.35)
+    Note over GuestApp,Booking: フェーズ1：予約リクエスト〜ホスト承認まで
+    end
+
+    GuestApp->>HostApp: ① 予約リクエスト送信\n（滞在日程・人数など）
+    HostApp->>APIGW: ② 認証要求\n（トークン検証）
+
+    alt 認証NG（未ログイン・トークン不正）
+        Auth-->>APIGW: ③ 認証NG
+        APIGW-->>GuestApp: ④ エラー応答\n（未ログイン・再ログインを促す）
+    else 認証OK
+        Auth-->>APIGW: ③ 認証OK
+
+        Note over APIGW,Auth: 以降のリクエスト/レスポンスも\n実際には API Gateway+Auth を経由するが図では省略
+
+        APIGW->>Booking: ④ Stay Request作成要求\n（ゲストID、ホストID、日程 等）
+        Booking->>DB: ⑤ 料金/空室の確認\n+リクエスト仮保存
+        DB-->>Booking: ⑥ OK（在庫・料金確定&リクエスト仮保存）
+
+        Note over Booking,DB: 以降のDBアクセスも基本的に「OK」応答だが図では省略
+
+        Booking-->>HostApp: ⑦ リクエスト通知\n（滞在内容・ゲスト情報の概要）
+        HostApp->>Booking: ⑧ 承認する／拒否する\n（ホストの選択結果）
+
+        alt ホストが「拒否」を選択
+            Booking->>DB: ⑨ リクエストIDのステータス更新\n（失敗／拒否）
+            Booking-->>GuestApp: ⑩ リクエスト拒否通知
+        else ホストが「承認」を選択
+            Booking->>DB: ⑨ リクエストIDのステータス更新\n（承認）
+            Booking-->>GuestApp: ⑩ 承認されました。\n決済へ進んでください
+        end
+    end
