@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stay One | 新規会員登録</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Helvetica", "Arial", sans-serif;
+      background-color: #f7f7f7;
+    }
+
+    /* ===== ヘッダー ===== */
+    header {
+      background-color: #00897b; /* エメラルド系の緑 */
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      font-size: 18px;
+    }
+
+    header a {
+      color: white;
+      text-decoration: none;
+      font-size: 15px;
+    }
+
+    /* ===== メインコンテンツ ===== */
+    .container {
+      max-width: 400px;
+      margin: 60px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    .title {
+      font-size: 24px;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #333;
+      font-size: 14px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    .register-btn {
+      width: 100%;
+      padding: 12px;
+      background-color: #00897b;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .register-btn:hover {
+      background-color: #00796b;
+    }
+
+    /* ===== フッター ===== */
+    footer {
+      background-color: #9e9e9e;
+      color: white;
+      padding: 10px 20px;
+      font-size: 12px;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      display: flex;
+      gap: 15px;
+    }
+
+    footer a {
+      color: white;
+      text-decoration: none;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header>
+    <div>Stay One</div>
+    <a href="#">ログイン</a>
+  </header>
+
+  <!-- メイン -->
+  <div class="container">
+    <div class="title">新規会員登録</div>
+
+    <div class="form-group">
+      <label>名前</label>
+      <input type="text" placeholder="山田 太郎">
+    </div>
+
+    <div class="form-group">
+      <label>メールアドレス</label>
+      <input type="email" placeholder="example@mail.com">
+    </div>
+
+    <div class="form-group">
+      <label>パスワード</label>
+      <input type="password" placeholder="8文字以上">
+    </div>
+
+    <div class="form-group">
+      <label>パスワード（確認）</label>
+      <input type="password" placeholder="もう一度入力してください">
+    </div>
+
+    <button class="register-btn">登録する</button>
+  </div>
+
+  <!-- フッター -->
+  <footer>
+    <a href="#">お問い合わせ</a>
+    <a href="#">利用規約</a>
+    <a href="#">プライバシーポリシー</a>
+  </footer>
+
+</body>
+</html>
