@@ -1,0 +1,76 @@
+.signup-main {
+  display: flex;
+  justify-content: center;
+}
+
+.signup-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+}
+
+.signup-headline {
+  text-align: center;
+}
+
+.signup-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(0, 137, 123, 0.12);
+  color: #00695c;
+  font-weight: 600;
+}
+
+.signup-title {
+  font-size: 26px;
+  margin: 12px 0 6px;
+  color: #333;
+}
+
+.signup-description {
+  color: #555;
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+
+.signup-form-group {
+  margin-bottom: 18px;
+}
+
+.signup-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: #333;
+  font-size: 14px;
+}
+
+.signup-form-group input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.signup-btn {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.signup-note {
+  margin-top: 16px;
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+}
+
+.signup-note a {
+  color: #00897b;
+  text-decoration: underline;
+}
