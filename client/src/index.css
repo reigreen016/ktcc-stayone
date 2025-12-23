@@ -388,3 +388,37 @@
     inset: -1px;
   }
 }
+
+body {
+  margin: 0;
+  font-family: "Helvetica", "Arial", sans-serif;
+  background-color: #f7f7f7;
+  color: #333;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background-color: #00897b;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.primary-btn:hover {
+  background-color: #00796b;
+}
