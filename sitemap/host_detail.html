@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StayOne | Host Details</title>
+  <style>
+    :root{
+      --brand:#00897b;
+      --brand-dark:#00796b;
+      --bg:#f7f7f7;
+      --card:#ffffff;
+      --ink:#333333;
+      --muted:#666666;
+      --line:#e0e0e0;
+      --soft:#fafafa;
+      --radius:12px;
+      --shadow:0 0 10px rgba(0,0,0,0.06);
+    }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; }
+    body{
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--ink);
+      line-height:1.6;
+    }
+    a{ color:inherit; text-decoration:none; }
+    button,input,select,textarea{ font:inherit; }
+
+    header{
+      background:var(--brand);
+      color:#fff;
+      padding:12px 20px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      font-size:18px;
+      font-weight:600;
+      position:sticky;
+      top:0;
+      z-index:30;
+    }
+    header .right{
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+    header a{
+      color:#fff;
+      font-size:14px;
+      font-weight:500;
+      opacity:.95;
+    }
+    header a:hover{ opacity:1; }
+
+    main{
+      max-width: 1040px;
+      margin: 22px auto 88px;
+      padding: 0 16px;
+    }
+
+    .page-title{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    h1{ font-size:22px; margin:0; }
+    .subtitle{
+      margin-top:6px;
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      border:1px solid var(--line);
+      padding:16px;
+      box-shadow:var(--shadow);
+    }
+    .card-title{
+      font-size:15px;
+      font-weight:800;
+      margin:0 0 12px;
+    }
+
+    .layout{
+      display:grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap:14px;
+      align-items:start;
+    }
+    @media (max-width: 920px){
+      .layout{ grid-template-columns: 1fr; }
+    }
+
+    /* Gallery */
+    .gallery{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:8px;
+      margin-bottom:12px;
+    }
+    @media (max-width: 640px){ .gallery{ grid-template-columns: repeat(2, 1fr);} }
+    .gimg{
+      height:110px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:linear-gradient(135deg,#e0e0e0,#f5f5f5);
+      position:relative;
+      overflow:hidden;
+    }
+    .gimg::after{
+      content:"";
+      position:absolute; inset:0;
+      background: radial-gradient(120% 70% at 0% 0%, rgba(0,137,123,.22), transparent 55%);
+    }
+
+    /* Key/Value */
+    .kv{
+      display:grid;
+      grid-template-columns: 170px 1fr;
+      gap:8px 12px;
+    }
+    .k{ font-size:12px; color:#666; }
+    .v{ font-size:13px; color:#333; font-weight:700; }
+
+    .pill-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:8px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid #cfd8dc;
+      background:#f5fafa;
+      font-size:12px;
+      color:#065f46;
+      font-weight:700;
+    }
+
+    /* Buttons */
+    .btn{
+      padding:12px 14px;
+      border-radius:10px;
+      border:1px solid #cfd8dc;
+      background:#fff;
+      cursor:pointer;
+      font-size:13px;
+      font-weight:800;
+      width:100%;
+    }
+    .btn:hover{ background:#f5f5f5; }
+    .btn-primary{
+      background:var(--brand);
+      border-color:var(--brand);
+      color:#fff;
+    }
+    .btn-primary:hover{ background:var(--brand-dark); }
+    .btn-row{ display:flex; gap:10px; }
+    .btn-row .btn{ width:100%; }
+
+    /* Availability calendar (read-only view) */
+    .cal-wrap{
+      border:1px solid var(--line);
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .cal-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      font-weight:800;
+      font-size:13px;
+    }
+    .cal-grid{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap:6px;
+      padding:12px;
+    }
+    .dow{
+      font-size:11px;
+      color:#666;
+      text-align:center;
+      font-weight:800;
+      padding:4px 0;
+    }
+    .day{
+      height:34px;
+      border-radius:10px;
+      border:1px solid #e5e7eb;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:12px;
+      color:#333;
+      background:#fff;
+      user-select:none;
+    }
+    .day.muted{
+      color:#aaa;
+      background:#fafafa;
+    }
+    .day.sel{
+      background:#e0f2f1;
+      border-color:#26a69a;
+      color:#075e54;
+      font-weight:900;
+    }
+    .note{
+      font-size:12px;
+      color:#777;
+      margin-top:10px;
+      line-height:1.5;
+    }
+
+    footer{
+      background:#9e9e9e;
+      color:#fff;
+      padding:10px 20px;
+      font-size:12px;
+      position:fixed;
+      bottom:0;
+      width:100%;
+      display:flex;
+      gap:15px;
+      z-index:20;
+    }
+    footer a{ color:#fff; text-decoration:none; font-size:12px; }
+
+    /* Toast */
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:20px;
+      transform:translateX(-50%);
+      background:rgba(15,23,42,.95);
+      color:#fff;
+      padding:10px 14px;
+      border-radius:999px;
+      font-size:13px;
+      font-weight:800;
+      z-index:120;
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .2s ease;
+    }
+    .toast.show{ opacity:1; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>StayOne</div>
+    <div class="right">
+      <a href="#">Find Hosts</a>
+      <a href="#">Bookings</a>
+      <a href="#">Profile</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">
+      <div>
+        <h1>Host Details</h1>
+        <div class="subtitle">Host profile, listing info, and available dates.</div>
+      </div>
+    </div>
+
+    <section class="layout">
+      <!-- LEFT: main content -->
+      <div>
+        <section class="card" style="margin-bottom:14px;">
+          <div class="card-title">Listing Photos</div>
+          <div class="gallery" aria-label="Photos (placeholders)">
+            <div class="gimg"></div><div class="gimg"></div><div class="gimg"></div>
+            <div class="gimg"></div><div class="gimg"></div><div class="gimg"></div>
+          </div>
+        </section>
+
+        <section class="card" style="margin-bottom:14px;">
+          <div class="card-title">Host Profile</div>
+
+          <div class="kv">
+            <div class="k">Nickname (Public)</div><div class="v" id="hNick">kodience</div>
+            <div class="k">Area (City/Ward)</div><div class="v" id="hArea">Osaka</div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <div class="k" style="font-weight:800; margin-bottom:6px;">Self introduction</div>
+            <div id="hIntro" style="font-size:13px; color:#444;">
+              Friendly host who enjoys cultural exchange. I can share local food spots and day-to-day tips in Osaka.
+            </div>
+          </div>
+
+          <div style="margin-top:14px; border-top:1px solid var(--line); padding-top:12px;">
+            <div class="card-title" style="margin:0 0 10px; font-size:14px;">Host Experience</div>
+            <div class="kv">
+              <div class="k">Hosting experience</div><div class="v" id="hExp">6 months</div>
+              <div class="k">Started hosting</div><div class="v" id="hStart">2025</div>
+              <div class="k">Guests accepted (approx.)</div><div class="v" id="hGuests">3</div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px; border-top:1px solid var(--line); padding-top:12px;">
+            <div class="card-title" style="margin:0 0 10px; font-size:14px;">Languages</div>
+            <div class="kv">
+              <div class="k">Languages supported</div><div class="v" id="hLang">Japanese, English, Chinese</div>
+              <div class="k">English level</div><div class="v" id="hEnLevel">Daily conversation</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">Listing Information</div>
+
+          <div class="kv">
+            <div class="k">Listing title</div><div class="v" id="lTitle">Quiet room near Namba</div>
+            <div class="k">Address (public range)</div><div class="v" id="lAddr">Osaka City (exact shown after booking)</div>
+            <div class="k">Nearest station / access</div><div class="v" id="lAccess">OO Station (6 min walk)</div>
+            <div class="k">Price per night</div><div class="v" id="lPrice">¥6,000</div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <div class="k" style="font-weight:800; margin-bottom:6px;">Features</div>
+            <div id="lFeat" style="font-size:13px; color:#444;">
+              Wi‑Fi, air conditioner, shared kitchen, clean and quiet neighborhood.
+            </div>
+          </div>
+
+          
+        </section>
+      </div>
+
+      <!-- RIGHT: actions + availability -->
+      <aside>
+        <section class="card" style="margin-bottom:14px;">
+          <div class="card-title">Actions</div>
+          <div class="btn-row" style="margin-bottom:10px;">
+            <button class="btn btn-primary" id="request" type="button">Request Booking</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="message" type="button">Message Host</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">Available Dates</div>
+
+          <div class="cal-wrap" aria-label="Availability calendar (read-only)">
+            <div class="cal-head">
+              <span id="calMonth">January 2026</span>
+              <span style="font-size:12px; color:#666; font-weight:700;">Multiple dates</span>
+            </div>
+
+            <div class="cal-grid" id="cal">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <div class="k" style="font-weight:800; margin-bottom:6px;">Selected dates</div>
+            <div class="pill-row" id="selectedPills"></div>
+            <div class="note">Selected dates are based on the property input tab (multi-select calendar).</div>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <div class="toast" id="toast">Saved</div>
+
+  <footer>
+    <a href="#">Contact</a>
+    <a href="#">Terms</a>
+    <a href="#">Privacy</a>
+  </footer>
+
+  <script>
+    'use strict';
+
+    // ---- Mock data (replace with real saved profile/listing data) ----
+    const hostProfile = {
+      nickname: "kodience",
+      area: "Osaka",
+      intro: "Friendly host who enjoys cultural exchange. I can share local food spots and day-to-day tips in Osaka.",
+      hostExp: "6 months",
+      startYear: "2025",
+      acceptedGuests: "3",
+      languages: "Japanese, English",
+      englishLevel: "Daily conversation"
+    };
+
+    const listing = {
+      title: "Quiet room near Umeda",
+      address: "Osaka City ",
+      access: "Osaka Station (6 min walk)",
+      price: 6000,
+      features: "Wi‑Fi, air conditioner, shared kitchen, clean and quiet neighborhood.",
+    };
+
+    // Availability: multiple selected dates (YYYY-MM-DD)
+    const selectedDates = new Set([
+      "2026-01-04","2026-01-05","2026-01-12","2026-01-19","2026-01-21"
+    ]);
+
+    // ---- Render profile/listing ----
+    const $ = (s, r=document)=>r.querySelector(s);
+    $('#hNick').textContent = hostProfile.nickname;
+    $('#hArea').textContent = hostProfile.area;
+    $('#hIntro').textContent = hostProfile.intro;
+    $('#hExp').textContent = hostProfile.hostExp;
+    $('#hStart').textContent = hostProfile.startYear;
+    $('#hGuests').textContent = hostProfile.acceptedGuests;
+    $('#hLang').textContent = hostProfile.languages;
+    $('#hEnLevel').textContent = hostProfile.englishLevel;
+
+    $('#lTitle').textContent = listing.title;
+    $('#lAddr').textContent  = listing.address;
+    $('#lAccess').textContent= listing.access;
+    $('#lPrice').textContent = "¥" + Number(listing.price).toLocaleString();
+    $('#lFeat').textContent  = listing.features;
+
+
+
+    // ---- Calendar (January 2026) ----
+    const month = 0; // Jan
+    const year = 2026;
+    $('#calMonth').textContent = new Date(year, month, 1).toLocaleString('en-US', { month:'long', year:'numeric' });
+
+    const cal = $('#cal');
+    const dows = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    dows.forEach(d=>{
+      const el = document.createElement('div');
+      el.className = 'dow';
+      el.textContent = d;
+      cal.appendChild(el);
+    });
+
+    const first = new Date(year, month, 1);
+    const last  = new Date(year, month+1, 0);
+    const startDow = first.getDay();
+    const daysInMonth = last.getDate();
+
+    // prev month tail
+    const prevLast = new Date(year, month, 0).getDate();
+    for(let i=0;i<startDow;i++){
+      const el = document.createElement('div');
+      el.className = 'day muted';
+      el.textContent = String(prevLast - (startDow-1-i));
+      cal.appendChild(el);
+    }
+
+    for(let d=1; d<=daysInMonth; d++){
+      const dt = new Date(year, month, d);
+      const iso = dt.toISOString().slice(0,10);
+      const el = document.createElement('div');
+      el.className = 'day' + (selectedDates.has(iso) ? ' sel' : '');
+      el.textContent = String(d);
+      cal.appendChild(el);
+    }
+
+    // next month head to fill 6 weeks (42 days) + 7 dow row = 49? Here grid includes dow row, so fill to 7*(1+6)=49
+    // We already placed 7 dows. Now fill remaining to 49.
+    const target = 7 * 7; // 49
+    let count = cal.children.length;
+    let nextDay = 1;
+    while(count < target){
+      const el = document.createElement('div');
+      el.className = 'day muted';
+      el.textContent = String(nextDay++);
+      cal.appendChild(el);
+      count++;
+    }
+
+    // Selected pills
+    const pills = $('#selectedPills');
+    const sorted = Array.from(selectedDates).sort();
+    sorted.forEach(iso=>{
+      const el = document.createElement('span');
+      el.className = 'pill';
+      const d = new Date(iso + "T00:00:00");
+      el.textContent = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+      pills.appendChild(el);
+    });
+    if(!sorted.length){
+      pills.innerHTML = '<span class="k">None selected</span>';
+    }
+
+    // Toast
+    const toast = $('#toast');
+    let timer = null;
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(()=>toast.classList.remove('show'), 1600);
+    }
+
+    $('#request').addEventListener('click', ()=> showToast('(Mock) Booking request sent'));
+    $('#message').addEventListener('click', ()=> showToast('(Mock) Opening message thread'));
+  </script>
+</body>
+</html>
