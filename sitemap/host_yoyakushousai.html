@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>StayOne | 予約詳細（ホスト）</title>
+  <style>
+    body { margin:0; font-family: Helvetica, Arial, sans-serif; background:#f7f7f7; }
+    header{
+      background:#00897b; color:#fff; padding:12px 20px;
+      display:flex; align-items:center; justify-content:space-between;
+      font-size:18px; font-weight:600;
+    }
+    header a{ color:#fff; text-decoration:none; font-size:14px; font-weight:500; }
+    main{ max-width: 980px; margin: 26px auto 90px; padding: 0 16px; }
+    .topbar{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .title{ font-size:22px; color:#333; margin:0; }
+    .sub{ margin-top:6px; font-size:13px; color:#666; }
+    .badge{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:6px 10px; border-radius:999px; font-size:12px;
+      border:1px solid #cfd8dc; background:#fff;
+    }
+    .badge .dot{ width:8px; height:8px; border-radius:50%; background:#ffb300; }
+    .grid{ display:grid; grid-template-columns: 1.2fr 0.8fr; gap:16px; }
+    .card{
+      background:#fff; border:1px solid #e0e0e0; border-radius:12px;
+      padding:16px 16px 18px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.06);
+    }
+    .card-title{ font-size:15px; font-weight:700; color:#333; margin:0 0 12px; }
+    .row{ display:flex; gap:14px; align-items:flex-start; }
+    .avatar{
+      width:56px; height:56px; border-radius:50%;
+      border:2px dashed #b2dfdb; background:#f0f9f8;
+      display:flex; align-items:center; justify-content:center;
+      color:#777; font-size:11px; flex:0 0 auto;
+      overflow:hidden;
+    }
+    .meta{ flex:1; min-width:0; }
+    .meta .name{ font-size:16px; font-weight:700; color:#333; margin:0; }
+    .meta .line{ font-size:12px; color:#666; margin-top:4px; }
+    .kv{ display:grid; grid-template-columns: 140px 1fr; gap:8px 12px; }
+    .k{ font-size:12px; color:#666; }
+    .v{ font-size:13px; color:#333; font-weight:600; }
+    .divider{ height:1px; background:#eee; margin:14px 0; }
+    .msg{
+      background:#fafafa; border:1px solid #e0e0e0; border-radius:10px;
+      padding:12px 12px; color:#444; font-size:13px; line-height:1.6;
+      white-space:pre-wrap;
+    }
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; }
+    .btn{
+      padding:10px 14px; border-radius:10px; border:1px solid #cfd8dc;
+      background:#fff; cursor:pointer; font-size:13px; font-weight:700;
+    }
+    .btn:hover{ background:#f5f5f5; }
+    .btn-primary{
+      background:#00897b; border-color:#00897b; color:#fff;
+    }
+    .btn-primary:hover{ background:#00796b; }
+    .btn-danger{
+      background:#fff; border-color:#ef9a9a; color:#c62828;
+    }
+    .btn-danger:hover{ background:#ffebee; }
+    .hint{ font-size:12px; color:#777; margin-top:10px; }
+    footer{
+      background:#9e9e9e; color:#fff; padding:10px 20px; font-size:12px;
+      position:fixed; bottom:0; width:100%; display:flex; gap:15px;
+    }
+    footer a{ color:#fff; text-decoration:none; font-size:12px; }
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>StayOne</div>
+    <a href="#">ダッシュボードへ</a>
+  </header>
+
+  <main>
+    <div class="topbar">
+      <div>
+        <h1 class="title">予約詳細</h1>
+        <div class="sub">ゲストからの予約依頼内容を確認し、確定または却下します。</div>
+      </div>
+      
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: details -->
+      <section class="card">
+        <h2 class="card-title">予約内容</h2>
+
+        <div class="kv">
+          <div class="k">宿泊日程</div><div class="v">2026/03/01 – 2026/03/07</div>
+          <div class="k">泊数</div><div class="v">6 nights</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <h2 class="card-title">ゲストからのメッセージ</h2>
+        <div class="msg">こんにちは！3月に1週間滞在を検討しています。
+最寄り駅からのアクセスと、夜遅めのチェックインが可能か教えてください。</div>
+
+        <div class="divider"></div>
+
+        <div class="actions">
+          <button class="btn btn-primary">予約を確定する</button>
+          <button class="btn btn-danger">却下する</button>
+          <button class="btn">ゲストにメッセージ</button>
+        </div>
+        <div class="hint">※「確定する」を押すと、ゲストに確定通知が送られる想定（この画面では見た目のみ）。</div>
+      </section>
+
+      <!-- RIGHT: guest summary -->
+      <aside class="card">
+        <h2 class="card-title">ゲスト情報</h2>
+
+        <div class="row">
+          <div class="avatar">Photo</div>
+          <div class="meta">
+            <p class="name">John Smith</p>
+            <div class="line">Nationality: United States</div>
+            <div class="line">Sex: Male</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="kv">
+          <div class="k">日本語（会話）</div><div class="v">Daily</div>
+          <div class="k">英語（会話）</div><div class="v">Fluent</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="actions">
+          <button class="btn">ゲストプロフィールを見る</button>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <a href="#">お問い合わせ</a>
+    <a href="#">利用規約</a>
+    <a href="#">プライバシーポリシー</a>
+  </footer>
+</body>
+</html>
