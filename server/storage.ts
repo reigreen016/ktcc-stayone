@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, desc, asc, gt, ne, sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   User,
@@ -19,6 +19,10 @@ import type {
   InsertPolicy,
   AuditLog,
   InsertAuditLog,
+  Conversation,
+  InsertConversation,
+  Message,
+  InsertMessage,
 } from "@shared/schema";
 
 const pool = new pg.Pool({
@@ -57,6 +61,16 @@ export interface IStorage {
   getStayStatusByBookingRequest(bookingRequestId: string): Promise<StayStatus | undefined>;
   createStayStatus(stayStatus: InsertStayStatus): Promise<StayStatus>;
   updateStayStatus(id: string, status: string): Promise<StayStatus | undefined>;
+
+  getConversation(id: string): Promise<Conversation | undefined>;
+  getConversationByBookingRequest(bookingRequestId: string): Promise<Conversation | undefined>;
+  getConversationsByUser(userId: string): Promise<Conversation[]>;
+  createConversation(conversation: InsertConversation): Promise<Conversation>;
+  updateConversationReadAt(conversationId: string, userId: string): Promise<Conversation | undefined>;
+  createMessage(message: InsertMessage): Promise<Message>;
+  getMessages(conversationId: string): Promise<Message[]>;
+  getLatestMessage(conversationId: string): Promise<Message | undefined>;
+  countUnreadMessages(conversationId: string, userId: string, since?: Date | null): Promise<number>;
 
   getPolicyByName(name: string): Promise<Policy | undefined>;
   createPolicy(policy: InsertPolicy): Promise<Policy>;
@@ -230,6 +244,107 @@ export class DbStorage implements IStorage {
       .where(eq(schema.stayStatuses.id, id))
       .returning();
     return result[0];
+  }
+
+  async getConversation(id: string): Promise<Conversation | undefined> {
+    const result = await db.select().from(schema.conversations).where(eq(schema.conversations.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getConversationByBookingRequest(bookingRequestId: string): Promise<Conversation | undefined> {
+    const result = await db
+      .select()
+      .from(schema.conversations)
+      .where(eq(schema.conversations.bookingRequestId, bookingRequestId))
+      .limit(1);
+    return result[0];
+  }
+
+  async getConversationsByUser(userId: string): Promise<Conversation[]> {
+    return await db
+      .select()
+      .from(schema.conversations)
+      .where(or(eq(schema.conversations.hostId, userId), eq(schema.conversations.guestId, userId)))
+      .orderBy(desc(schema.conversations.updatedAt));
+  }
+
+  async createConversation(conversation: InsertConversation): Promise<Conversation> {
+    const result = await db.insert(schema.conversations).values(conversation).returning();
+    return result[0];
+  }
+
+  async updateConversationReadAt(conversationId: string, userId: string): Promise<Conversation | undefined> {
+    const conversation = await this.getConversation(conversationId);
+    if (!conversation) {
+      return undefined;
+    }
+
+    const updates: Partial<Conversation> = {};
+    const now = new Date();
+    if (conversation.hostId === userId) {
+      updates.hostLastReadAt = now;
+    } else if (conversation.guestId === userId) {
+      updates.guestLastReadAt = now;
+    } else {
+      return undefined;
+    }
+
+    const result = await db
+      .update(schema.conversations)
+      .set(updates)
+      .where(eq(schema.conversations.id, conversationId))
+      .returning();
+    return result[0];
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const now = new Date();
+    const result = await db.insert(schema.messages).values({ ...message, createdAt: now }).returning();
+    const inserted = result[0];
+
+    const conversation = await this.getConversation(message.conversationId);
+    if (conversation) {
+      const updates: Partial<Conversation> = { updatedAt: now };
+      if (conversation.hostId === message.senderId) {
+        updates.hostLastReadAt = now;
+      } else if (conversation.guestId === message.senderId) {
+        updates.guestLastReadAt = now;
+      }
+      await db.update(schema.conversations).set(updates).where(eq(schema.conversations.id, conversation.id));
+    }
+
+    return inserted;
+  }
+
+  async getMessages(conversationId: string): Promise<Message[]> {
+    return await db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.conversationId, conversationId))
+      .orderBy(asc(schema.messages.createdAt));
+  }
+
+  async getLatestMessage(conversationId: string): Promise<Message | undefined> {
+    const result = await db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.conversationId, conversationId))
+      .orderBy(desc(schema.messages.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async countUnreadMessages(conversationId: string, userId: string, since?: Date | null): Promise<number> {
+    let condition = and(eq(schema.messages.conversationId, conversationId), ne(schema.messages.senderId, userId));
+    if (since) {
+      condition = and(condition, gt(schema.messages.createdAt, since));
+    }
+
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.messages)
+      .where(condition);
+    return Number(result[0]?.count ?? 0);
   }
 
   async getPolicyByName(name: string): Promise<Policy | undefined> {

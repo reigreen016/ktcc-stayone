@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -85,14 +86,42 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
+
+  const listen = (options: { reusePort: boolean }) =>
+    new Promise<void>((resolve, reject) => {
+      const onError = (err: NodeJS.ErrnoException) => {
+        httpServer.off("listening", onListening);
+        reject(err);
+      };
+      const onListening = () => {
+        httpServer.off("error", onError);
+        log(
+          `serving on port ${port}${
+            options.reusePort ? " (reusePort)" : ""
+          }`,
+        );
+        resolve();
+      };
+
+      httpServer.once("error", onError);
+      httpServer.listen(
+        {
+          port,
+          host: "0.0.0.0",
+          ...(options.reusePort ? { reusePort: true } : {}),
+        },
+        onListening,
+      );
+    });
+
+  try {
+    await listen({ reusePort: true });
+  } catch (error: any) {
+    if (error && error.code === "ENOTSUP") {
+      log("reusePort unsupported on this platform. Retrying without it.");
+      await listen({ reusePort: false });
+    } else {
+      throw error;
+    }
+  }
 })();

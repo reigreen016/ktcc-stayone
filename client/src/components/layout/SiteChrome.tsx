@@ -6,6 +6,7 @@ const navLinks = [
   { href: "/", label: "ホストマイページ" },
   { href: "/host/signup", label: "ホスト登録" },
   { href: "/guest/profile", label: "ゲストプロフィール" },
+  { href: "/guest/messages", label: "ゲストメッセージ" },
 ];
 
 export function SiteHeader() {

@@ -115,6 +115,40 @@ export const insertStayStatusSchema = createInsertSchema(stayStatuses).omit({
 export type InsertStayStatus = z.infer<typeof insertStayStatusSchema>;
 export type StayStatus = typeof stayStatuses.$inferSelect;
 
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingRequestId: varchar("booking_request_id").notNull().references(() => bookingRequests.id).unique(),
+  hostId: varchar("host_id").notNull().references(() => users.id),
+  guestId: varchar("guest_id").notNull().references(() => users.id),
+  hostLastReadAt: timestamp("host_last_read_at").defaultNow().notNull(),
+  guestLastReadAt: timestamp("guest_last_read_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => conversations.id),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+
 export const policies = pgTable("policies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
