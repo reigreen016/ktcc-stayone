@@ -1,9 +1,18 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { authMiddleware, requireRole, hashPassword, verifyPassword, generateToken } from "./auth";
-import { insertUserSchema, insertBookingRequestSchema, insertPaymentSchema, insertFeePaymentSchema, insertRefundSchema, insertPolicySchema } from "@shared/schema";
+import { authMiddleware, requireRole, hashPassword, verifyPassword, generateToken, verifyToken } from "./auth";
+import {
+  insertUserSchema,
+  insertBookingRequestSchema,
+  insertPaymentSchema,
+  insertFeePaymentSchema,
+  insertRefundSchema,
+  insertPolicySchema,
+} from "@shared/schema";
+import type { BookingRequest, Conversation, Message } from "@shared/schema";
 import { z } from "zod";
+import { WebSocketServer, WebSocket } from "ws";
 
 async function logAudit(
   entityType: string,
@@ -27,11 +36,196 @@ async function logAudit(
   });
 }
 
+type BasicUserResponse = {
+  id: string;
+  username: string;
+  walletAddress: string;
+};
+
+type BookingSummaryResponse = {
+  id: string;
+  propertyId: string;
+  checkInDate: string;
+  checkOutDate: string;
+  status: string;
+  totalAmount: string;
+};
+
+export type MessageResponse = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+};
+
+type ConversationResponse = {
+  id: string;
+  bookingRequestId: string;
+  host: BasicUserResponse;
+  guest: BasicUserResponse;
+  booking: BookingSummaryResponse;
+  lastMessage: MessageResponse | null;
+  unreadCount: number;
+};
+
+type ChatEvent =
+  | { type: "chat:new-message"; payload: MessageResponse }
+  | { type: "chat:conversation-ready"; payload: ConversationResponse };
+
+function toIsoString(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function serializeMessage(message: Message): MessageResponse {
+  return {
+    id: message.id,
+    conversationId: message.conversationId,
+    senderId: message.senderId,
+    body: message.body,
+    createdAt: toIsoString(message.createdAt),
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+  const socketsByUser = new Map<string, Set<WebSocket>>();
+  const wss = new WebSocketServer({ server: httpServer, path: "/ws/chat" });
+  wss.on("error", (err: NodeJS.ErrnoException) => {
+    if (err?.code === "ENOTSUP") {
+      // handled by http server fallback
+      return;
+    }
+    console.warn(`[ws] ${err?.message ?? err}`);
+  });
+
+  function emitToUser(userId: string, event: ChatEvent) {
+    const sockets = socketsByUser.get(userId);
+    if (!sockets) {
+      return;
+    }
+
+    const payload = JSON.stringify(event);
+    sockets.forEach((socket) => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(payload);
+      }
+    });
+  }
+
+  wss.on("connection", (socket, req) => {
+    try {
+      const url = new URL(req.url || "", "http://localhost");
+      const token = url.searchParams.get("token");
+      if (!token) {
+        socket.close(4001, "TOKEN_REQUIRED");
+        return;
+      }
+
+      const payload = verifyToken(token);
+      const userId = payload.userId;
+
+      if (!socketsByUser.has(userId)) {
+        socketsByUser.set(userId, new Set());
+      }
+      socketsByUser.get(userId)!.add(socket);
+
+      socket.on("close", () => {
+        const userSockets = socketsByUser.get(userId);
+        if (!userSockets) {
+          return;
+        }
+        userSockets.delete(socket);
+        if (userSockets.size === 0) {
+          socketsByUser.delete(userId);
+        }
+      });
+    } catch (error) {
+      socket.close(4002, "UNAUTHORIZED");
+    }
+  });
+
+  const userCanAccessConversation = (conversation: Conversation, userId: string) => {
+    return conversation.hostId === userId || conversation.guestId === userId;
+  };
+
+  async function buildConversationResponse(conversation: Conversation, viewerId: string): Promise<ConversationResponse> {
+    const [host, guest, booking, lastMessage] = await Promise.all([
+      storage.getUser(conversation.hostId),
+      storage.getUser(conversation.guestId),
+      storage.getBookingRequest(conversation.bookingRequestId),
+      storage.getLatestMessage(conversation.id),
+    ]);
+
+    if (!host || !guest || !booking) {
+      throw new Error("関連データの取得に失敗しました");
+    }
+
+    const lastReadAt = conversation.hostId === viewerId ? conversation.hostLastReadAt : conversation.guestLastReadAt;
+    const unreadCount = await storage.countUnreadMessages(conversation.id, viewerId, lastReadAt);
+
+    return {
+      id: conversation.id,
+      bookingRequestId: conversation.bookingRequestId,
+      host: {
+        id: host.id,
+        username: host.username,
+        walletAddress: host.walletAddress,
+      },
+      guest: {
+        id: guest.id,
+        username: guest.username,
+        walletAddress: guest.walletAddress,
+      },
+      booking: {
+        id: booking.id,
+        propertyId: booking.propertyId,
+        checkInDate: toIsoString(booking.checkInDate),
+        checkOutDate: toIsoString(booking.checkOutDate),
+        status: booking.status,
+        totalAmount: booking.totalAmount.toString(),
+      },
+      lastMessage: lastMessage ? serializeMessage(lastMessage) : null,
+      unreadCount,
+    };
+  }
+
+  async function ensureConversationForBooking(bookingRequest: BookingRequest, userId?: string) {
+    let conversation = await storage.getConversationByBookingRequest(bookingRequest.id);
+    if (conversation) {
+      return conversation;
+    }
+
+    conversation = await storage.createConversation({
+      bookingRequestId: bookingRequest.id,
+      hostId: bookingRequest.hostId,
+      guestId: bookingRequest.guestId,
+    });
+
+    await logAudit("conversation", conversation.id, "CREATED", userId, null, conversation);
+    return conversation;
+  }
+
+  async function broadcastConversationSnapshot(conversation: Conversation) {
+    const participants = [conversation.hostId, conversation.guestId];
+    await Promise.all(
+      participants.map(async (participantId) => {
+        const payload = await buildConversationResponse(conversation, participantId);
+        emitToUser(participantId, { type: "chat:conversation-ready", payload });
+      }),
+    );
+  }
+
+  const ensureConversationSchema = z.object({
+    bookingRequestId: z.string().min(1),
+  });
+
+  const messageBodySchema = z.object({
+    body: z.string().min(1).max(1000),
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const data = insertUserSchema.parse(req.body);
@@ -167,6 +361,14 @@ export async function registerRoutes(
 
       await logAudit("booking_request", id, "APPROVED", req.user!.userId, previousState, updatedBooking);
 
+      if (updatedBooking) {
+        const conversation = await ensureConversationForBooking(updatedBooking, req.user!.userId);
+        const refreshedConversation = await storage.getConversation(conversation.id);
+        if (refreshedConversation) {
+          await broadcastConversationSnapshot(refreshedConversation);
+        }
+      }
+
       return res.status(200).json(updatedBooking);
     } catch (error) {
       console.error("Booking approval error:", error);
@@ -200,6 +402,118 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Booking rejection error:", error);
       return res.status(500).json({ message: "予約の拒否に失敗しました" });
+    }
+  });
+
+  app.post("/api/conversations", authMiddleware, requireRole("host", "guest"), async (req, res) => {
+    try {
+      const { bookingRequestId } = ensureConversationSchema.parse(req.body);
+      const bookingRequest = await storage.getBookingRequest(bookingRequestId);
+
+      if (!bookingRequest) {
+        return res.status(404).json({ message: "予約が見つかりません" });
+      }
+
+      if (bookingRequest.hostId !== req.user!.userId && bookingRequest.guestId !== req.user!.userId) {
+        return res.status(403).json({ message: "この予約のチャットを開く権限がありません" });
+      }
+
+      if (bookingRequest.status !== "APPROVED") {
+        return res.status(400).json({ message: "承認済みの予約のみチャットが利用できます" });
+      }
+
+      const conversation = await ensureConversationForBooking(bookingRequest, req.user!.userId);
+      await storage.updateConversationReadAt(conversation.id, req.user!.userId);
+      const refreshedConversation = await storage.getConversation(conversation.id);
+
+      if (!refreshedConversation) {
+        return res.status(500).json({ message: "チャットの作成に失敗しました" });
+      }
+
+      await broadcastConversationSnapshot(refreshedConversation);
+      const response = await buildConversationResponse(refreshedConversation, req.user!.userId);
+      return res.status(200).json(response);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "入力データが不正です", errors: error.errors });
+      }
+      console.error("Ensure conversation error:", error);
+      return res.status(500).json({ message: "チャットの作成に失敗しました" });
+    }
+  });
+
+  app.get("/api/conversations", authMiddleware, requireRole("host", "guest"), async (req, res) => {
+    try {
+      const userId = req.user!.userId;
+      const conversations = await storage.getConversationsByUser(userId);
+      const payloads = await Promise.all(conversations.map((conversation) => buildConversationResponse(conversation, userId)));
+      return res.status(200).json(payloads);
+    } catch (error) {
+      console.error("Get conversations error:", error);
+      return res.status(500).json({ message: "チャット一覧の取得に失敗しました" });
+    }
+  });
+
+  app.get("/api/conversations/:conversationId/messages", authMiddleware, requireRole("host", "guest"), async (req, res) => {
+    try {
+      const { conversationId } = req.params;
+      const conversation = await storage.getConversation(conversationId);
+
+      if (!conversation) {
+        return res.status(404).json({ message: "チャットが見つかりません" });
+      }
+
+      if (!userCanAccessConversation(conversation, req.user!.userId)) {
+        return res.status(403).json({ message: "このチャットにアクセスする権限がありません" });
+      }
+
+      await storage.updateConversationReadAt(conversation.id, req.user!.userId);
+      const messages = await storage.getMessages(conversation.id);
+      return res.status(200).json(messages.map(serializeMessage));
+    } catch (error) {
+      console.error("Get chat messages error:", error);
+      return res.status(500).json({ message: "メッセージの取得に失敗しました" });
+    }
+  });
+
+  app.post("/api/conversations/:conversationId/messages", authMiddleware, requireRole("host", "guest"), async (req, res) => {
+    try {
+      const { conversationId } = req.params;
+      const { body } = messageBodySchema.parse(req.body);
+      const conversation = await storage.getConversation(conversationId);
+
+      if (!conversation) {
+        return res.status(404).json({ message: "チャットが見つかりません" });
+      }
+
+      if (!userCanAccessConversation(conversation, req.user!.userId)) {
+        return res.status(403).json({ message: "このチャットにアクセスする権限がありません" });
+      }
+
+      const message = await storage.createMessage({
+        conversationId: conversation.id,
+        senderId: req.user!.userId,
+        body,
+      });
+
+      await logAudit("chat_message", message.id, "CREATED", req.user!.userId, null, message);
+
+      const serialized = serializeMessage(message);
+      const latestConversation = await storage.getConversation(conversation.id);
+      if (latestConversation) {
+        [latestConversation.hostId, latestConversation.guestId].forEach((participantId) => {
+          emitToUser(participantId, { type: "chat:new-message", payload: serialized });
+        });
+        await broadcastConversationSnapshot(latestConversation);
+      }
+
+      return res.status(201).json(serialized);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "入力データが不正です", errors: error.errors });
+      }
+      console.error("Create chat message error:", error);
+      return res.status(500).json({ message: "メッセージの送信に失敗しました" });
     }
   });
 

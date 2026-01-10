@@ -212,6 +212,13 @@
   overflow-y: auto;
 }
 
+.thread-empty {
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: #777;
+}
+
 .thread-item {
   padding: 12px;
   border-bottom: 1px solid #f0f0f0;
@@ -234,6 +241,12 @@
   font-weight: 600;
   margin-bottom: 4px;
   color: #333;
+}
+
+.thread-tagline {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 4px;
 }
 
 .thread-snippet {
@@ -309,6 +322,18 @@
   padding: 14px;
   background: #fafafa;
   overflow-y: auto;
+}
+
+.chat-body-loading,
+.chat-empty-state {
+  text-align: center;
+  color: #777;
+  font-size: 13px;
+  padding: 24px;
+}
+
+.chat-area-empty {
+  justify-content: center;
 }
 
 .chat-date-divider {
