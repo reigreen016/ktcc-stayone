@@ -1,16 +1,29 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/context/auth-context";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import "./site-chrome.css";
-
-const navLinks = [
-  { href: "/", label: "ホストマイページ" },
-  { href: "/host/signup", label: "ホスト登録" },
-  { href: "/guest/profile", label: "ゲストプロフィール" },
-  { href: "/guest/messages", label: "ゲストメッセージ" },
-];
 
 export function SiteHeader() {
   const [location] = useLocation();
+  const { token, user } = useAuth();
+  const isAuthRoute = location === "/auth";
+  const { data: accountMode } = useQuery<{ preferredRole: "host" | "guest" | null } | null>({
+    queryKey: ["/api/account/mode", user?.userId ?? "anon"],
+    enabled: Boolean(token),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/account/mode");
+      return (await res.json()) as { preferredRole: "host" | "guest" | null };
+    },
+  });
+
+  const navLinks = [
+    ...(token && accountMode?.preferredRole === "host" ? [{ href: "/", label: "ホストマイページ" }] : []),
+    ...(token && accountMode?.preferredRole === "guest" ? [{ href: "/guest", label: "ゲストマイページ" }] : []),
+    ...(token ? [{ href: "/mode", label: "利用モード変更" }] : []),
+    ...(!token ? [{ href: "/auth", label: "ログイン/登録" }] : []),
+  ];
 
   return (
     <header className="site-header">
@@ -18,20 +31,22 @@ export function SiteHeader() {
         Stay One
       </Link>
 
-      <nav className="site-nav">
-        {navLinks.map((link) => {
-          const isActive = location === link.href;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={isActive ? "site-nav-link active" : "site-nav-link"}
-            >
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {!isAuthRoute && (
+        <nav className="site-nav">
+          {navLinks.map((link) => {
+            const isActive = location === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={isActive ? "site-nav-link active" : "site-nav-link"}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+      )}
 
       <button type="button" className="wallet-button">
         ウォレット接続

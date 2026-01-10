@@ -20,6 +20,69 @@ import "./host-dashboard.css";
 
 type TabKey = "profile" | "property" | "message";
 
+type HostProfileForm = {
+  profilePhoto: string;
+  nickname: string;
+  location: string;
+  bio: string;
+  hostExperience: string;
+  startYear: string;
+  totalHosted: string;
+  badges: string[];
+  languages: string[];
+  englishLevel: string;
+  englishNote: string;
+};
+
+type HostPropertyForm = {
+  title: string;
+  address: string;
+  nearestAccess: string;
+  pricePerNight: string;
+  capacity: string;
+  amenities: string;
+  photos: string[];
+};
+
+type HostProfileResponse = {
+  nickname: string | null;
+  location: string | null;
+  bio: string | null;
+  hostExperience: string | null;
+  startYear: number | null;
+  totalHosted: number | null;
+  badges: string[] | null;
+  languages: string[] | null;
+  englishLevel: string | null;
+  englishNote: string | null;
+  updatedAt: string;
+};
+
+type HostProfilePayload = {
+  nickname?: string | null;
+  location?: string | null;
+  bio?: string | null;
+  hostExperience?: string | null;
+  startYear?: number | null;
+  totalHosted?: number | null;
+  badges?: string[] | null;
+  languages?: string[] | null;
+  englishLevel?: string | null;
+  englishNote?: string | null;
+};
+
+type HostPropertyResponse = {
+  title: string | null;
+  address: string | null;
+  nearestAccess: string | null;
+  pricePerNight: number | null;
+  capacity: number | null;
+  amenities: string | null;
+  photos: string[] | null;
+  availabilityDates: string[] | null;
+  updatedAt: string;
+};
+
 
 type CalendarCell = {
   date: Date;
@@ -103,23 +166,132 @@ function getThreadTime(conversation: ConversationSummary) {
 
 export default function HostDashboard() {
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
-  const [englishLevel, setEnglishLevel] = useState("daily");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messageDraft, setMessageDraft] = useState("");
+  const [isProfileEditing, setIsProfileEditing] = useState(true);
+  const [isPropertyEditing, setIsPropertyEditing] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [propertyLoaded, setPropertyLoaded] = useState(false);
+  const [profileSavedAt, setProfileSavedAt] = useState<Date | null>(null);
+  const [propertySavedAt, setPropertySavedAt] = useState<Date | null>(null);
+  const [profileForm, setProfileForm] = useState<HostProfileForm>({
+    profilePhoto: "",
+    nickname: "",
+    location: "",
+    bio: "",
+    hostExperience: "",
+    startYear: "",
+    totalHosted: "",
+    badges: [],
+    languages: [],
+    englishLevel: "daily",
+    englishNote: "",
+  });
+  const [propertyForm, setPropertyForm] = useState<HostPropertyForm>({
+    title: "",
+    address: "",
+    nearestAccess: "",
+    pricePerNight: "",
+    capacity: "",
+    amenities: "",
+    photos: [],
+  });
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDates, setSelectedDates] = useState<Set<string>>(
     () => new Set<string>(),
   );
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const viewerId = user?.userId;
+  const { data: accountMode } = useQuery<{ preferredRole: "host" | "guest" | null } | null>({
+    queryKey: ["/api/account/mode", viewerId ?? "anon"],
+    enabled: Boolean(viewerId),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/account/mode");
+      return (await res.json()) as { preferredRole: "host" | "guest" | null };
+    },
+  });
   const {
     data: conversations = [],
     isLoading: isConversationLoading,
   } = useQuery<ConversationSummary[]>({
     queryKey: ["/api/conversations"],
   });
+
+  const hostProfileKey = useMemo(() => ["hostProfile", viewerId ?? "anon"], [viewerId]);
+  const hostPropertyKey = useMemo(() => ["hostProperty", viewerId ?? "anon"], [viewerId]);
+
+  const { data: hostProfile } = useQuery<HostProfileResponse | null>({
+    queryKey: hostProfileKey,
+    enabled: Boolean(viewerId),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/host/profile");
+      return (await res.json()) as HostProfileResponse | null;
+    },
+  });
+
+  const { data: hostProperty } = useQuery<HostPropertyResponse | null>({
+    queryKey: hostPropertyKey,
+    enabled: Boolean(viewerId),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/host/property");
+      return (await res.json()) as HostPropertyResponse | null;
+    },
+  });
+
+  const accountPhotoKey = useMemo(() => ["accountProfilePhoto", viewerId ?? "anon"], [viewerId]);
+  const { data: accountPhoto } = useQuery<{ profilePhoto: string | null } | null>({
+    queryKey: accountPhotoKey,
+    enabled: Boolean(viewerId),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/account/profile-photo");
+      return (await res.json()) as { profilePhoto: string | null };
+    },
+  });
+
+  useEffect(() => {
+    setProfileLoaded(false);
+    setPropertyLoaded(false);
+    setIsProfileEditing(true);
+    setIsPropertyEditing(true);
+    setProfileSavedAt(null);
+    setPropertySavedAt(null);
+    setProfileForm({
+      profilePhoto: "",
+      nickname: "",
+      location: "",
+      bio: "",
+      hostExperience: "",
+      startYear: "",
+      totalHosted: "",
+      badges: [],
+      languages: [],
+      englishLevel: "daily",
+      englishNote: "",
+    });
+    setPropertyForm({
+      title: "",
+      address: "",
+      nearestAccess: "",
+      pricePerNight: "",
+      capacity: "",
+      amenities: "",
+      photos: [],
+    });
+    setSelectedDates(new Set<string>());
+  }, [viewerId]);
+
+  useEffect(() => {
+    if (accountMode?.preferredRole === "guest") {
+      queryClient.clear();
+      setLocation("/guest");
+    }
+    if (accountMode && !accountMode.preferredRole) {
+      setLocation("/mode");
+    }
+  }, [accountMode, queryClient, setLocation]);
 
   useEffect(() => {
     if (conversations.length === 0) {
@@ -133,6 +305,89 @@ export default function HostDashboard() {
       setActiveThreadId(conversations[0].id);
     }
   }, [conversations, activeThreadId]);
+
+  useEffect(() => {
+    if (profileLoaded) {
+      return;
+    }
+    if (hostProfile === undefined) {
+      return;
+    }
+    if (hostProfile) {
+      setProfileForm({
+        profilePhoto: accountPhoto?.profilePhoto ?? "",
+        nickname: hostProfile.nickname ?? "",
+        location: hostProfile.location ?? "",
+        bio: hostProfile.bio ?? "",
+        hostExperience: hostProfile.hostExperience ?? "",
+        startYear: hostProfile.startYear?.toString() ?? "",
+        totalHosted: hostProfile.totalHosted?.toString() ?? "",
+        badges: hostProfile.badges ?? [],
+        languages: hostProfile.languages ?? [],
+        englishLevel: hostProfile.englishLevel ?? "daily",
+        englishNote: hostProfile.englishNote ?? "",
+      });
+      setIsProfileEditing(false);
+      setProfileSavedAt(hostProfile.updatedAt ? new Date(hostProfile.updatedAt) : null);
+    } else {
+      setProfileForm((prev) => ({
+        ...prev,
+        profilePhoto: accountPhoto?.profilePhoto ?? "",
+      }));
+      setIsProfileEditing(!accountPhoto?.profilePhoto);
+      if (accountPhoto?.profilePhoto) {
+        setProfileSavedAt(new Date());
+      }
+    }
+    setProfileLoaded(true);
+  }, [hostProfile, profileLoaded, accountPhoto]);
+
+  useEffect(() => {
+    if (!accountPhoto) {
+      return;
+    }
+    if (profileForm.profilePhoto) {
+      if (!isProfileEditing && profileForm.profilePhoto !== (accountPhoto.profilePhoto ?? "")) {
+        setProfileForm((prev) => ({
+          ...prev,
+          profilePhoto: accountPhoto.profilePhoto ?? "",
+        }));
+      }
+      return;
+    }
+    if (accountPhoto.profilePhoto) {
+      setProfileForm((prev) => ({
+        ...prev,
+        profilePhoto: accountPhoto.profilePhoto ?? "",
+      }));
+    }
+  }, [accountPhoto, isProfileEditing, profileForm.profilePhoto]);
+
+  useEffect(() => {
+    if (propertyLoaded) {
+      return;
+    }
+    if (hostProperty === undefined) {
+      return;
+    }
+    if (hostProperty) {
+      setPropertyForm({
+        title: hostProperty.title ?? "",
+        address: hostProperty.address ?? "",
+        nearestAccess: hostProperty.nearestAccess ?? "",
+        pricePerNight: hostProperty.pricePerNight?.toString() ?? "",
+        capacity: hostProperty.capacity?.toString() ?? "",
+        amenities: hostProperty.amenities ?? "",
+        photos: hostProperty.photos ?? [],
+      });
+      setSelectedDates(new Set(hostProperty.availabilityDates ?? []));
+      setIsPropertyEditing(false);
+      setPropertySavedAt(hostProperty.updatedAt ? new Date(hostProperty.updatedAt) : null);
+    } else {
+      setIsPropertyEditing(true);
+    }
+    setPropertyLoaded(true);
+  }, [hostProperty, propertyLoaded]);
 
   const filteredThreads = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -221,6 +476,71 @@ export default function HostDashboard() {
     },
   });
 
+  const saveProfileMutation = useMutation({
+    mutationFn: async (payload: HostProfilePayload) => {
+      const res = await apiRequest("PUT", "/api/host/profile", payload);
+      return (await res.json()) as HostProfileResponse;
+    },
+    onSuccess: (saved) => {
+      queryClient.setQueryData(hostProfileKey, saved);
+      setIsProfileEditing(false);
+      setProfileSavedAt(saved.updatedAt ? new Date(saved.updatedAt) : new Date());
+      toast({
+        title: "プロフィールを保存しました",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "プロフィールの保存に失敗しました",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveAccountPhotoMutation = useMutation({
+    mutationFn: async (profilePhoto: string | null) => {
+      const res = await apiRequest("PUT", "/api/account/profile-photo", { profilePhoto });
+      return (await res.json()) as { profilePhoto: string | null };
+    },
+    onSuccess: (saved) => {
+      queryClient.setQueryData(accountPhotoKey, saved);
+      setProfileForm((prev) => ({
+        ...prev,
+        profilePhoto: saved.profilePhoto ?? "",
+      }));
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "プロフィール写真の保存に失敗しました",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const savePropertyMutation = useMutation({
+    mutationFn: async (payload: Partial<HostPropertyResponse>) => {
+      const res = await apiRequest("PUT", "/api/host/property", payload);
+      return (await res.json()) as HostPropertyResponse;
+    },
+    onSuccess: (saved) => {
+      queryClient.setQueryData(hostPropertyKey, saved);
+      setIsPropertyEditing(false);
+      setPropertySavedAt(saved.updatedAt ? new Date(saved.updatedAt) : new Date());
+      toast({
+        title: "物件情報を保存しました",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "物件情報の保存に失敗しました",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const canSendMessage = Boolean(activeThreadId && messageDraft.trim() && !sendMessageMutation.isPending);
 
   const handleSendMessage = async (event: FormEvent<HTMLFormElement>) => {
@@ -234,6 +554,88 @@ export default function HostDashboard() {
       body: messageDraft.trim(),
     });
     setMessageDraft("");
+  };
+
+  const handleSaveProfile = async () => {
+    const startYear = profileForm.startYear.trim() ? Number(profileForm.startYear) : null;
+    const totalHosted = profileForm.totalHosted.trim() ? Number(profileForm.totalHosted) : null;
+    await saveAccountPhotoMutation.mutateAsync(profileForm.profilePhoto || null);
+    await saveProfileMutation.mutateAsync({
+      nickname: profileForm.nickname,
+      location: profileForm.location,
+      bio: profileForm.bio,
+      hostExperience: profileForm.hostExperience,
+      startYear: Number.isFinite(startYear) ? startYear : null,
+      totalHosted: Number.isFinite(totalHosted) ? totalHosted : null,
+      badges: profileForm.badges,
+      languages: profileForm.languages,
+      englishLevel: profileForm.englishLevel,
+      englishNote: profileForm.englishNote,
+    });
+  };
+
+  const handleRemovePhoto = async () => {
+    await saveAccountPhotoMutation.mutateAsync(null);
+    setProfileForm((prev) => ({
+      ...prev,
+      profilePhoto: "",
+    }));
+    setIsProfileEditing(true);
+  };
+
+  const handleSaveProperty = async () => {
+    const pricePerNight = propertyForm.pricePerNight.trim() ? Number(propertyForm.pricePerNight) : null;
+    const capacity = propertyForm.capacity.trim() ? Number(propertyForm.capacity) : null;
+    await savePropertyMutation.mutateAsync({
+      title: propertyForm.title,
+      address: propertyForm.address,
+      nearestAccess: propertyForm.nearestAccess,
+      pricePerNight: Number.isFinite(pricePerNight) ? pricePerNight : null,
+      capacity: Number.isFinite(capacity) ? capacity : null,
+      amenities: propertyForm.amenities,
+      photos: propertyForm.photos,
+      availabilityDates: Array.from(selectedDates),
+    });
+  };
+
+  const handlePropertyPhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isPropertyEditing) {
+      return;
+    }
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+    const availableSlots = Math.max(0, 3 - propertyForm.photos.length);
+    const nextFiles = files.slice(0, availableSlots);
+    if (nextFiles.length === 0) {
+      return;
+    }
+    nextFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setPropertyForm((prev) => {
+            if (prev.photos.length >= 3) {
+              return prev;
+            }
+            return { ...prev, photos: [...prev.photos, reader.result as string] };
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    event.target.value = "";
+  };
+
+  const handleRemovePropertyPhoto = (index: number) => {
+    if (!isPropertyEditing) {
+      return;
+    }
+    setPropertyForm((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index),
+    }));
   };
 
   useChatEvents((event) => {
@@ -323,7 +725,57 @@ export default function HostDashboard() {
     [selectedDates],
   );
 
+  const toggleBadge = (badge: string) => {
+    if (!isProfileEditing) {
+      return;
+    }
+    setProfileForm((prev) => {
+      const next = new Set(prev.badges);
+      if (next.has(badge)) {
+        next.delete(badge);
+      } else {
+        next.add(badge);
+      }
+      return { ...prev, badges: Array.from(next) };
+    });
+  };
+
+  const toggleLanguage = (language: string) => {
+    if (!isProfileEditing) {
+      return;
+    }
+    setProfileForm((prev) => {
+      const next = new Set(prev.languages);
+      if (next.has(language)) {
+        next.delete(language);
+      } else {
+        next.add(language);
+      }
+      return { ...prev, languages: Array.from(next) };
+    });
+  };
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isProfileEditing) {
+      return;
+    }
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setProfileForm((prev) => ({ ...prev, profilePhoto: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const toggleDate = (key: string) => {
+    if (!isPropertyEditing) {
+      return;
+    }
     setSelectedDates((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
@@ -335,9 +787,19 @@ export default function HostDashboard() {
     });
   };
 
-  const clearSelectedDates = () => setSelectedDates(new Set<string>());
+  const clearSelectedDates = () => {
+    if (!isPropertyEditing) {
+      return;
+    }
+    setSelectedDates(new Set<string>());
+  };
 
-  const goToToday = () => setCurrentMonth(startOfMonth(new Date()));
+  const goToToday = () => {
+    if (!isPropertyEditing) {
+      return;
+    }
+    setCurrentMonth(startOfMonth(new Date()));
+  };
 
   return (
     <PageLayout mainClassName="host-main">
@@ -366,64 +828,147 @@ export default function HostDashboard() {
         className={activeTab === "profile" ? "tab-content active" : "tab-content"}
         id="profile"
       >
-        <div className="section-title">プロフィール入力</div>
+        <div className="section-title-row">
+          <div className="section-title">プロフィール入力</div>
+          <div className="section-controls">
+            {!isProfileEditing && <span className="section-saved">保存済み</span>}
+            {isProfileEditing ? (
+              <button
+                type="button"
+                className="primary-btn section-save-btn"
+                onClick={handleSaveProfile}
+                disabled={saveProfileMutation.isPending}
+              >
+                {saveProfileMutation.isPending ? "保存中..." : "保存する"}
+              </button>
+            ) : (
+              <button type="button" className="ghost-btn" onClick={() => setIsProfileEditing(true)}>
+                編集する
+              </button>
+            )}
+          </div>
+        </div>
 
-        <div className="profile-card">
+        <div className={isProfileEditing ? "profile-card" : "profile-card is-saved"}>
+          <h3 className="profile-card-title">プロフィール写真</h3>
+          <div className="avatar-wrap">
+            <div className="avatar-preview">
+              {profileForm.profilePhoto ? (
+                <img src={profileForm.profilePhoto} alt="Host profile" />
+              ) : (
+                "Your Photo"
+              )}
+            </div>
+            <div className="avatar-actions">
+              <label className="avatar-upload">
+                <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={!isProfileEditing} />
+                写真を選択
+              </label>
+              {profileForm.profilePhoto && (
+                <button type="button" className="avatar-remove" onClick={handleRemovePhoto}>
+                  写真を削除
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className={isProfileEditing ? "profile-card" : "profile-card is-saved"}>
           <h3 className="profile-card-title">基本情報</h3>
           <div className="form-grid-2">
             <div className="form-group">
               <label>ニックネーム(公開用)</label>
-              <input type="text" placeholder="例）たろう" />
+              <input
+                type="text"
+                placeholder="例）たろう"
+                value={profileForm.nickname}
+                onChange={(event) => setProfileForm((prev) => ({ ...prev, nickname: event.target.value }))}
+                disabled={!isProfileEditing}
+              />
             </div>
             <div className="form-group">
               <label>所在地（市区町村）</label>
-              <input type="text" placeholder="例）大阪市中央区" />
+              <input
+                type="text"
+                placeholder="例）大阪市中央区"
+                value={profileForm.location}
+                onChange={(event) => setProfileForm((prev) => ({ ...prev, location: event.target.value }))}
+                disabled={!isProfileEditing}
+              />
             </div>
           </div>
           <div className="form-group">
             <label>自己紹介</label>
-            <textarea placeholder="簡単な紹介（400字まで）" />
+            <textarea
+              placeholder="簡単な紹介（400字まで）"
+              value={profileForm.bio}
+              onChange={(event) => setProfileForm((prev) => ({ ...prev, bio: event.target.value }))}
+              disabled={!isProfileEditing}
+            />
             <div className="helper-text">0 / 400</div>
           </div>
         </div>
 
-        <div className="profile-card">
+        <div className={isProfileEditing ? "profile-card" : "profile-card is-saved"}>
           <h3 className="profile-card-title">ホスト経歴</h3>
           <div className="form-grid-2">
             <div className="form-group">
               <label>ホスト歴（年、月）</label>
-              <input type="text" placeholder="例）1年6ヶ月" />
+              <input
+                type="text"
+                placeholder="例）1年6ヶ月"
+                value={profileForm.hostExperience}
+                onChange={(event) => setProfileForm((prev) => ({ ...prev, hostExperience: event.target.value }))}
+                disabled={!isProfileEditing}
+              />
             </div>
             <div className="form-group">
               <label>開始年</label>
-              <input type="number" placeholder="例）2022" />
+              <input
+                type="number"
+                placeholder="例）2022"
+                value={profileForm.startYear}
+                onChange={(event) => setProfileForm((prev) => ({ ...prev, startYear: event.target.value }))}
+                disabled={!isProfileEditing}
+              />
             </div>
             <div className="form-group">
               <label>受入回数（延べ）</label>
-              <input type="number" placeholder="例）3" />
+              <input
+                type="number"
+                placeholder="例）3"
+                value={profileForm.totalHosted}
+                onChange={(event) => setProfileForm((prev) => ({ ...prev, totalHosted: event.target.value }))}
+                disabled={!isProfileEditing}
+              />
             </div>
           </div>
         </div>
 
-        <div className="profile-card">
+        <div className={isProfileEditing ? "profile-card" : "profile-card is-saved"}>
           <h3 className="profile-card-title">認証バッジ</h3>
           <div className="badge-group">
             {badgeOptions.map((badge) => (
               <label key={badge} className="badge-check">
-                <input type="checkbox" defaultChecked={badge === badgeOptions[0]} />
+                <input
+                  type="checkbox"
+                  checked={profileForm.badges.includes(badge)}
+                  onChange={() => toggleBadge(badge)}
+                  disabled={!isProfileEditing}
+                />
                 {badge}
               </label>
             ))}
           </div>
         </div>
 
-        <div className="profile-card">
+        <div className={isProfileEditing ? "profile-card" : "profile-card is-saved"}>
           <h3 className="profile-card-title">対応言語</h3>
           <div className="lang-actions">
-            <button type="button" className="chip-btn">
+            <button type="button" className="chip-btn" disabled={!isProfileEditing}>
               + 新しい言語を追加
             </button>
-            <button type="button" className="chip-btn">
+            <button type="button" className="chip-btn" disabled={!isProfileEditing}>
               Web3バッジと同期
             </button>
           </div>
@@ -431,7 +976,12 @@ export default function HostDashboard() {
             {languagePresets.map((language) => (
               <div key={language} className="lang-item">
                 <label>
-                  <input type="checkbox" defaultChecked={language === "日本語"} />
+                  <input
+                    type="checkbox"
+                    checked={profileForm.languages.includes(language)}
+                    onChange={() => toggleLanguage(language)}
+                    disabled={!isProfileEditing}
+                  />
                   {language}
                 </label>
               </div>
@@ -439,7 +989,7 @@ export default function HostDashboard() {
           </div>
         </div>
 
-        <div className="profile-card">
+        <div className={isProfileEditing ? "profile-card" : "profile-card is-saved"}>
           <h3 className="profile-card-title">
             英語スキルレベル <span className="required">＊</span>
           </h3>
@@ -450,64 +1000,153 @@ export default function HostDashboard() {
                   type="radio"
                   name="english_level"
                   value={value}
-                  checked={englishLevel === value}
-                  onChange={() => setEnglishLevel(value)}
+                  checked={profileForm.englishLevel === value}
+                  onChange={() => setProfileForm((prev) => ({ ...prev, englishLevel: value }))}
+                  disabled={!isProfileEditing}
                 />
                 {label}
               </label>
             ))}
           </div>
-          {englishLevel === "other" && (
+          {profileForm.englishLevel === "other" && (
             <div className="form-group">
               <label>「その他」を選んだ方</label>
-              <input type="text" placeholder="例）TOEIC◯◯点、留学経験あり など" />
+              <input
+                type="text"
+                placeholder="例）TOEIC◯◯点、留学経験あり など"
+                value={profileForm.englishNote}
+                onChange={(event) => setProfileForm((prev) => ({ ...prev, englishNote: event.target.value }))}
+                disabled={!isProfileEditing}
+              />
             </div>
           )}
         </div>
-
-        <button type="button" className="primary-btn">
-          プロフィールを保存
-        </button>
       </section>
 
       <section
         className={activeTab === "property" ? "tab-content active" : "tab-content"}
         id="property"
       >
-        <div className="section-title">物件情報入力</div>
-        <div className="profile-card">
+        <div className="section-title-row">
+          <div className="section-title">物件情報入力</div>
+          <div className="section-controls">
+            {!isPropertyEditing && <span className="section-saved">保存済み</span>}
+            {isPropertyEditing ? (
+              <button
+                type="button"
+                className="primary-btn section-save-btn"
+                onClick={handleSaveProperty}
+                disabled={savePropertyMutation.isPending}
+              >
+                {savePropertyMutation.isPending ? "保存中..." : "保存する"}
+              </button>
+            ) : (
+              <button type="button" className="ghost-btn" onClick={() => setIsPropertyEditing(true)}>
+                編集する
+              </button>
+            )}
+          </div>
+        </div>
+        <div className={isPropertyEditing ? "profile-card" : "profile-card is-saved"}>
           <h3 className="profile-card-title">基本情報</h3>
           <div className="form-group">
+            <label>物件写真（最大3枚）</label>
+            <div className="property-photos">
+              <div className="photo-grid">
+                {propertyForm.photos.map((photo, index) => (
+                  <div key={`property-photo-${index}`} className="photo-tile">
+                    <img src={photo} alt={`Property ${index + 1}`} />
+                    {isPropertyEditing && (
+                      <button
+                        type="button"
+                        className="photo-remove"
+                        onClick={() => handleRemovePropertyPhoto(index)}
+                      >
+                        削除
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {propertyForm.photos.length < 3 && (
+                  <label className="photo-upload">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePropertyPhotoChange}
+                      disabled={!isPropertyEditing}
+                    />
+                    写真を追加
+                  </label>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="form-group">
             <label>物件タイトル</label>
-            <input type="text" placeholder="例：京都・町家の静かな一室" />
+            <input
+              type="text"
+              placeholder="例：京都・町家の静かな一室"
+              value={propertyForm.title}
+              onChange={(event) => setPropertyForm((prev) => ({ ...prev, title: event.target.value }))}
+              disabled={!isPropertyEditing}
+            />
           </div>
           <div className="form-grid-2">
             <div className="form-group">
               <label>住所（ゲストには市区町村まで表示）</label>
-              <input type="text" placeholder="例：京都市東山区" />
+              <input
+                type="text"
+                placeholder="例：京都市東山区"
+                value={propertyForm.address}
+                onChange={(event) => setPropertyForm((prev) => ({ ...prev, address: event.target.value }))}
+                disabled={!isPropertyEditing}
+              />
             </div>
             <div className="form-group">
               <label>最寄駅 / バス</label>
-              <input type="text" placeholder="例：〇〇駅 徒歩6分" />
+              <input
+                type="text"
+                placeholder="例：〇〇駅 徒歩6分"
+                value={propertyForm.nearestAccess}
+                onChange={(event) => setPropertyForm((prev) => ({ ...prev, nearestAccess: event.target.value }))}
+                disabled={!isPropertyEditing}
+              />
             </div>
           </div>
           <div className="form-grid-2">
             <div className="form-group">
               <label>宿泊料金（1泊あたり）</label>
-              <input type="number" placeholder="例：6000" />
+              <input
+                type="number"
+                placeholder="例：6000"
+                value={propertyForm.pricePerNight}
+                onChange={(event) => setPropertyForm((prev) => ({ ...prev, pricePerNight: event.target.value }))}
+                disabled={!isPropertyEditing}
+              />
             </div>
             <div className="form-group">
               <label>最大宿泊人数</label>
-              <input type="number" placeholder="例：2" />
+              <input
+                type="number"
+                placeholder="例：2"
+                value={propertyForm.capacity}
+                onChange={(event) => setPropertyForm((prev) => ({ ...prev, capacity: event.target.value }))}
+                disabled={!isPropertyEditing}
+              />
             </div>
           </div>
           <div className="form-group">
             <label>設備・特徴</label>
-            <textarea placeholder="例：Wi-Fi、エアコン、朝食付き…" />
+            <textarea
+              placeholder="例：Wi-Fi、エアコン、朝食付き…"
+              value={propertyForm.amenities}
+              onChange={(event) => setPropertyForm((prev) => ({ ...prev, amenities: event.target.value }))}
+              disabled={!isPropertyEditing}
+            />
           </div>
         </div>
 
-        <div className="profile-card">
+        <div className={isPropertyEditing ? "profile-card" : "profile-card is-saved"}>
           <h3 className="profile-card-title">受け入れ可能日（複数選択）</h3>
           <div className="calendar-wrap">
             <div className="cal-header">
@@ -516,6 +1155,7 @@ export default function HostDashboard() {
                 className="cal-nav"
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                 aria-label="前の月"
+                disabled={!isPropertyEditing}
               >
                 ‹
               </button>
@@ -525,6 +1165,7 @@ export default function HostDashboard() {
                 className="cal-nav"
                 onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                 aria-label="次の月"
+                disabled={!isPropertyEditing}
               >
                 ›
               </button>
@@ -543,6 +1184,7 @@ export default function HostDashboard() {
                   cell.isToday ? "today" : "",
                   isSelected ? "selected" : "",
                   !cell.isCurrentMonth ? "disabled" : "",
+                  !isPropertyEditing ? "disabled" : "",
                 ]
                   .filter(Boolean)
                   .join(" ");
@@ -552,7 +1194,7 @@ export default function HostDashboard() {
                     key={cell.key}
                     className={classes}
                     onClick={() => cell.isCurrentMonth && toggleDate(cell.key)}
-                    disabled={!cell.isCurrentMonth}
+                    disabled={!cell.isCurrentMonth || !isPropertyEditing}
                   >
                     {cell.label}
                   </button>
@@ -560,10 +1202,10 @@ export default function HostDashboard() {
               })}
             </div>
             <div className="cal-footer">
-              <button type="button" className="chip-btn" onClick={clearSelectedDates}>
+              <button type="button" className="chip-btn" onClick={clearSelectedDates} disabled={!isPropertyEditing}>
                 選択を全解除
               </button>
-              <button type="button" className="chip-btn" onClick={goToToday}>
+              <button type="button" className="chip-btn" onClick={goToToday} disabled={!isPropertyEditing}>
                 今月へ戻る
               </button>
             </div>
@@ -587,10 +1229,6 @@ export default function HostDashboard() {
             </small>
           </div>
         </div>
-
-        <button type="button" className="primary-btn">
-          物件情報を保存
-        </button>
       </section>
 
       <section
@@ -697,3 +1335,4 @@ export default function HostDashboard() {
     </PageLayout>
   );
 }
+import { useLocation } from "wouter";
