@@ -191,13 +191,11 @@
       background:linear-gradient(135deg, #e0f2f1, #f5f5f5);
       border-bottom:1px solid var(--line);
       position:relative;
+      overflow:hidden;
     }
-    .thumb::after{
-      content:"";
-      position:absolute;
-      inset:0;
-      background: radial-gradient(120% 70% at 20% 10%, rgba(0,137,123,.22), transparent 55%);
-    }
+    /* 画像を使うので疑似ハイライトは消す（好みで復活OK） */
+    .thumb::after{ content:none; }
+
     .host-body{ padding:12px 12px 14px; }
     .host-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
     .host-name{ font-weight:800; font-size:15px; margin:0; }
@@ -270,6 +268,7 @@
       display:flex; align-items:center; justify-content:center;
       color:#777; font-size:11px;
       flex:0 0 auto;
+      overflow:hidden;
     }
     .modal-title h2{
       margin:0;
@@ -310,6 +309,7 @@
       margin-bottom:12px;
     }
     @media (max-width: 640px){ .gallery{ grid-template-columns: repeat(2, 1fr);} }
+
     .gimg{
       height:110px;
       border-radius:12px;
@@ -318,11 +318,8 @@
       position:relative;
       overflow:hidden;
     }
-    .gimg::after{
-      content:"";
-      position:absolute; inset:0;
-      background: radial-gradient(120% 70% at 0% 0%, rgba(0,137,123,.22), transparent 55%);
-    }
+    /* 画像を使うので疑似ハイライトは消す（好みで復活OK） */
+    .gimg::after{ content:none; }
 
     .section{
       border:1px solid var(--line);
@@ -393,6 +390,16 @@
       z-index:20;
     }
     footer a{ color:#fff; text-decoration:none; font-size:12px; }
+
+    /* ===== 追加: 画像を枠いっぱいに表示 ===== */
+    .thumb img,
+    .gimg img,
+    .face img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
   </style>
 </head>
 <body>
@@ -462,7 +469,8 @@
     <div class="panel" role="dialog" aria-modal="true" aria-label="Host details">
       <div class="modal-header">
         <div class="modal-title">
-          <div class="face">Photo</div>
+          <!-- ★ 顔写真も「img{idx}-1.png」を表示（無ければダミー） -->
+          <div class="face" aria-hidden="true"></div>
           <div style="min-width:0;">
             <h2 id="dName">—</h2>
             <div class="small" id="dLoc">—</div>
@@ -473,10 +481,8 @@
 
       <div class="modal-body">
         <div>
-          <div class="gallery" aria-label="Photos (mock)">
-            <div class="gimg"></div><div class="gimg"></div><div class="gimg"></div>
-            <div class="gimg"></div><div class="gimg"></div><div class="gimg"></div>
-          </div>
+          <!-- ★ ギャラリーを動的生成するため空にしておく -->
+          <div class="gallery" id="gallery" aria-label="Photos"></div>
 
           <div class="section" style="margin-bottom:14px;">
             <h3>About the host</h3>
@@ -531,9 +537,47 @@
   <script>
     'use strict';
 
+    // ===== 画像が無い場合のダミー（エラー回避） =====
+    const FALLBACK_SVG = `data:image/svg+xml;charset=UTF-8,` + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="800" height="500">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#e0f2f1"/>
+            <stop offset="1" stop-color="#f5f5f5"/>
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#g)"/>
+        <rect x="22" y="22" width="756" height="456" rx="18" ry="18"
+              fill="none" stroke="#cfd8dc" stroke-width="4" stroke-dasharray="10 10"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+              font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial"
+              font-size="28" fill="#607d8b">
+          No Image
+        </text>
+      </svg>
+    `);
+
+    // imageフォルダ参照: image/img1-1.png ... image/img6-6.png
+    function imgPath(idx, j){
+      return `image/img${idx}-${j}.png`;
+    }
+
+    function makeSafeImg(src, alt=""){
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = alt;
+      img.src = src;
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = FALLBACK_SVG;
+      };
+      return img;
+    }
+
     const hosts = [
       {
         id:"h1",
+        idx: 1,
         name:"Osaka • Taro",
         pref:"Osaka", city:"Osaka City",
         rating:4.6, reviews:23,
@@ -544,11 +588,12 @@
         style:["Quiet","Solo-friendly"],
         intro:"A student host who loves cultural exchange. Quiet neighborhood near the station.",
         about:"I balance research and part-time work. I keep the space clean and calm. I can support simple English conversations.",
-        amen:["Private room (single)","Wi‑Fi","Washing machine","Shared kitchen","Air conditioner"],
+        amen:["Private room (single)","Wi-Fi","Washing machine","Shared kitchen","Air conditioner"],
         rules:["No smoking indoors","Keep quiet after 22:00","Guests/visitors by request"]
       },
       {
         id:"h2",
+        idx: 2,
         name:"Kyoto • Jiro",
         pref:"Kyoto", city:"Kyoto City",
         rating:4.8, reviews:41,
@@ -559,11 +604,12 @@
         style:["Quiet","Traditional"],
         intro:"Renovated 80-year-old townhouse. Calm and authentic Japanese atmosphere.",
         about:"Walkable to the Kamo River and Gion area. Great for guests who want a quiet cultural stay.",
-        amen:["Private room (futon)","Wi‑Fi","Hinoki bath","Floor heating","Kitchen area"],
+        amen:["Private room (futon)","Wi-Fi","Hinoki bath","Floor heating","Kitchen area"],
         rules:["No shoes indoors","No smoking","Be mindful of noise after 22:00"]
       },
       {
         id:"h3",
+        idx: 3,
         name:"Kobe • Saburo",
         pref:"Hyogo", city:"Kobe City",
         rating:4.4, reviews:12,
@@ -574,11 +620,12 @@
         style:["Friends","City walk"],
         intro:"Modern interior near Arima Onsen. Convenient for sightseeing.",
         about:"I can recommend cafes and bakeries nearby. Great for guests who enjoy seaside walks.",
-        amen:["Twin room (max 2)","Wi‑Fi","Projector","Shared kitchen","Shower"],
+        amen:["Twin room (max 2)","Wi-Fi","Projector","Shared kitchen","Shower"],
         rules:["No smoking indoors","No pets","Keep noise down at night"]
       },
       {
         id:"h4",
+        idx: 4,
         name:"Kyoto • Strong English Support",
         pref:"Kyoto", city:"Kyoto City",
         rating:4.7, reviews:18,
@@ -589,11 +636,12 @@
         style:["First-timers","Helpful"],
         intro:"Ideal for first-time visitors. I can help with daily life tips in English.",
         about:"I studied abroad. I can explain house rules, transportation, and local routines clearly.",
-        amen:["Private room","Wi‑Fi","Washing machine","Shared kitchen"],
+        amen:["Private room","Wi-Fi","Washing machine","Shared kitchen"],
         rules:["No smoking indoors","Keep shared areas clean","Be quiet late at night"]
       },
       {
         id:"h5",
+        idx: 5,
         name:"Osaka • Local Food Experience",
         pref:"Osaka", city:"Osaka City",
         rating:4.5, reviews:9,
@@ -604,11 +652,12 @@
         style:["Local","Food"],
         intro:"Enjoy local food culture together. Shopping street nearby for a real-life stay.",
         about:"If you like, I can introduce local spots for takoyaki and okonomiyaki.",
-        amen:["Private room","Wi‑Fi","Kitchen","Air conditioner"],
+        amen:["Private room","Wi-Fi","Kitchen","Air conditioner"],
         rules:["No smoking indoors","Wash dishes after use","Quiet hours at night"]
       },
       {
         id:"h6",
+        idx: 6,
         name:"Kobe • Quiet Residential Area",
         pref:"Hyogo", city:"Kobe City",
         rating:4.6, reviews:15,
@@ -619,7 +668,7 @@
         style:["Quiet","Long-stay"],
         intro:"A calm residential area—great for studying or remote work.",
         about:"I prioritize a quiet environment. Best match for guests with a similar daily rhythm.",
-        amen:["Private room","Wi‑Fi","Desk","Washing machine"],
+        amen:["Private room","Wi-Fi","Desk","Washing machine"],
         rules:["No smoking indoors","Keep quiet after 22:00","No visitors"]
       }
     ];
@@ -632,10 +681,12 @@
 
     function yen(n){ return '¥' + Number(n).toLocaleString() + ' / night'; }
 
+    // ===== Hosts一覧カード（各ホスト=6つ）にサムネを挿入 =====
     function card(h){
       const el = document.createElement('article');
       el.className = 'host-card';
       el.tabIndex = 0;
+
       el.innerHTML = `
         <div class="thumb" aria-hidden="true"></div>
         <div class="host-body">
@@ -653,6 +704,10 @@
           <p class="host-desc">${h.intro}</p>
         </div>
       `;
+
+      // thumbは img{idx}-1 を使う（無ければダミー）
+      el.querySelector('.thumb').appendChild(makeSafeImg(imgPath(h.idx, 1), "Host thumbnail"));
+
       el.addEventListener('click', ()=>open(h));
       el.addEventListener('keydown', (e)=>{
         if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(h); }
@@ -678,8 +733,11 @@
     $('#close2').addEventListener('click', close);
 
     let current = null;
+
+    // ===== 各ホストのモーダルを開いたとき、6枚（計36枚）を自動挿入 =====
     function open(h){
       current = h;
+
       $('#dName').textContent = h.name;
       $('#dLoc').textContent  = `${h.pref} • ${h.city} · ${h.station}`;
       $('#dAbout').textContent= h.about;
@@ -689,6 +747,21 @@
       $('#dRate').textContent = `⭐ ${h.rating.toFixed(1)} (${h.reviews})`;
       $('#dPrice').textContent = yen(h.price);
       $('#dIO').textContent = h.io;
+
+      // 顔写真も img{idx}-1 を使う（無ければダミー）
+      const face = document.querySelector('.face');
+      face.innerHTML = '';
+      face.appendChild(makeSafeImg(imgPath(h.idx, 1), "Host avatar"));
+
+      // ギャラリー6枚：image/img{idx}-1.png ～ image/img{idx}-6.png
+      const gal = $('#gallery');
+      gal.innerHTML = '';
+      for(let j=1; j<=6; j++){
+        const box = document.createElement('div');
+        box.className = 'gimg';
+        box.appendChild(makeSafeImg(imgPath(h.idx, j), `Host photo ${h.idx}-${j}`));
+        gal.appendChild(box);
+      }
 
       const amen = $('#dAmen'); amen.innerHTML='';
       h.amen.forEach(x=>{ const li=document.createElement('li'); li.textContent=x; amen.appendChild(li); });
