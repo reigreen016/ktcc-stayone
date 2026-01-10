@@ -59,7 +59,12 @@ export function requireRole(...allowedRoles: string[]) {
       return res.status(401).json({ message: "認証が必要です" });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    const { role } = req.user;
+    const hasStandardAccess = allowedRoles.includes(role);
+    const isMember = role === "member";
+    const allowsMember = allowedRoles.some((allowed) => allowed === "host" || allowed === "guest" || allowed === "member");
+
+    if (!hasStandardAccess && !(isMember && allowsMember)) {
       return res.status(403).json({ message: "権限がありません" });
     }
 

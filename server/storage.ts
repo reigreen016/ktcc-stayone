@@ -23,6 +23,12 @@ import type {
   InsertConversation,
   Message,
   InsertMessage,
+  HostProfile,
+  InsertHostProfile,
+  HostProperty,
+  InsertHostProperty,
+  GuestProfile,
+  InsertGuestProfile,
 } from "@shared/schema";
 
 const pool = new pg.Pool({
@@ -36,6 +42,10 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByWallet(walletAddress: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserProfilePhoto(userId: string, profilePhoto: string | null): Promise<User | undefined>;
+  getUserProfilePhoto(userId: string): Promise<string | null>;
+  updateUserPreferredRole(userId: string, preferredRole: string | null): Promise<User | undefined>;
+  getUserPreferredRole(userId: string): Promise<string | null>;
 
   getBookingRequest(id: string): Promise<BookingRequest | undefined>;
   getBookingRequestsByGuest(guestId: string): Promise<BookingRequest[]>;
@@ -72,6 +82,14 @@ export interface IStorage {
   getLatestMessage(conversationId: string): Promise<Message | undefined>;
   countUnreadMessages(conversationId: string, userId: string, since?: Date | null): Promise<number>;
 
+  getHostProfileByUserId(userId: string): Promise<HostProfile | undefined>;
+  upsertHostProfile(userId: string, profile: InsertHostProfile): Promise<HostProfile>;
+  getHostPropertyByUserId(userId: string): Promise<HostProperty | undefined>;
+  upsertHostProperty(userId: string, property: InsertHostProperty): Promise<HostProperty>;
+  getGuestProfileByUserId(userId: string): Promise<GuestProfile | undefined>;
+  upsertGuestProfile(userId: string, profile: InsertGuestProfile): Promise<GuestProfile>;
+  getProfilePhotoByUserId(userId: string): Promise<string | null>;
+
   getPolicyByName(name: string): Promise<Policy | undefined>;
   createPolicy(policy: InsertPolicy): Promise<Policy>;
   updatePolicy(name: string, config: any): Promise<Policy | undefined>;
@@ -102,6 +120,69 @@ export class DbStorage implements IStorage {
   async createUser(user: InsertUser): Promise<User> {
     const result = await db.insert(schema.users).values(user).returning();
     return result[0];
+  }
+
+  async updateUserProfilePhoto(userId: string, profilePhoto: string | null): Promise<User | undefined> {
+    const result = await db
+      .update(schema.users)
+      .set({ profilePhoto })
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async getUserProfilePhoto(userId: string): Promise<string | null> {
+    const result = await db
+      .select({ profilePhoto: schema.users.profilePhoto })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+    const existing = result[0]?.profilePhoto ?? null;
+    if (existing) {
+      return existing;
+    }
+
+    const host = await db
+      .select({ profilePhoto: schema.hostProfiles.profilePhoto })
+      .from(schema.hostProfiles)
+      .where(eq(schema.hostProfiles.userId, userId))
+      .limit(1);
+    const fallback = host[0]?.profilePhoto ?? null;
+    if (fallback) {
+      await this.updateUserProfilePhoto(userId, fallback);
+      return fallback;
+    }
+
+    const guest = await db
+      .select({ profilePhoto: schema.guestProfiles.profilePhoto })
+      .from(schema.guestProfiles)
+      .where(eq(schema.guestProfiles.userId, userId))
+      .limit(1);
+    const guestPhoto = guest[0]?.profilePhoto ?? null;
+    if (guestPhoto) {
+      await this.updateUserProfilePhoto(userId, guestPhoto);
+      return guestPhoto;
+    }
+
+    return null;
+  }
+
+  async updateUserPreferredRole(userId: string, preferredRole: string | null): Promise<User | undefined> {
+    const result = await db
+      .update(schema.users)
+      .set({ preferredRole })
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async getUserPreferredRole(userId: string): Promise<string | null> {
+    const result = await db
+      .select({ preferredRole: schema.users.preferredRole })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+    return result[0]?.preferredRole ?? null;
   }
 
   async getBookingRequest(id: string): Promise<BookingRequest | undefined> {
@@ -345,6 +426,64 @@ export class DbStorage implements IStorage {
       .from(schema.messages)
       .where(condition);
     return Number(result[0]?.count ?? 0);
+  }
+
+  async getHostProfileByUserId(userId: string): Promise<HostProfile | undefined> {
+    const result = await db.select().from(schema.hostProfiles).where(eq(schema.hostProfiles.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async upsertHostProfile(userId: string, profile: InsertHostProfile): Promise<HostProfile> {
+    const updates = { ...profile, userId, updatedAt: new Date() };
+    const result = await db
+      .insert(schema.hostProfiles)
+      .values(updates)
+      .onConflictDoUpdate({
+        target: schema.hostProfiles.userId,
+        set: updates,
+      })
+      .returning();
+    return result[0];
+  }
+
+  async getHostPropertyByUserId(userId: string): Promise<HostProperty | undefined> {
+    const result = await db.select().from(schema.hostProperties).where(eq(schema.hostProperties.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async upsertHostProperty(userId: string, property: InsertHostProperty): Promise<HostProperty> {
+    const updates = { ...property, userId, updatedAt: new Date() };
+    const result = await db
+      .insert(schema.hostProperties)
+      .values(updates)
+      .onConflictDoUpdate({
+        target: schema.hostProperties.userId,
+        set: updates,
+      })
+      .returning();
+    return result[0];
+  }
+
+  async getGuestProfileByUserId(userId: string): Promise<GuestProfile | undefined> {
+    const result = await db.select().from(schema.guestProfiles).where(eq(schema.guestProfiles.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async upsertGuestProfile(userId: string, profile: InsertGuestProfile): Promise<GuestProfile> {
+    const updates = { ...profile, userId, updatedAt: new Date() };
+    const result = await db
+      .insert(schema.guestProfiles)
+      .values(updates)
+      .onConflictDoUpdate({
+        target: schema.guestProfiles.userId,
+        set: updates,
+      })
+      .returning();
+    return result[0];
+  }
+
+  async getProfilePhotoByUserId(userId: string): Promise<string | null> {
+    return await this.getUserProfilePhoto(userId);
   }
 
   async getPolicyByName(name: string): Promise<Policy | undefined> {

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useLocation } from "wouter";
 import { AuthContext } from "@/context/auth-context";
 import {
   clearAuthToken,
@@ -7,17 +8,21 @@ import {
   setAuthToken,
   type AuthTokenPayload,
 } from "@/lib/auth";
+import { queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 type DemoAuthGateProps = {
   children: ReactNode;
 };
 
 export function DemoAuthGate({ children }: DemoAuthGateProps) {
+  const [location, setLocation] = useLocation();
   const [token, setTokenState] = useState<string | null>(() => getAuthToken());
   const [user, setUser] = useState<AuthTokenPayload | null>(() => decodeAuthToken(getAuthToken()));
-  const [draftToken, setDraftToken] = useState("");
-  const [isEditorOpen, setIsEditorOpen] = useState(!token);
-  const [error, setError] = useState<string | null>(null);
+  const publicPaths = useMemo(() => new Set(["/auth", "/signup", "/login", "/host/signup", "/guest/signup"]), []);
+  const isPublicRoute = publicPaths.has(location);
+  const prevTokenRef = useRef<string | null>(token);
 
   const setToken = (nextToken: string | null) => {
     if (nextToken) {
@@ -25,73 +30,30 @@ export function DemoAuthGate({ children }: DemoAuthGateProps) {
     } else {
       clearAuthToken();
     }
+    if (nextToken !== token) {
+      queryClient.clear();
+    }
     setTokenState(nextToken);
     setUser(decodeAuthToken(nextToken));
   };
 
   useEffect(() => {
-    if (isEditorOpen) {
-      setDraftToken(token ?? "");
-      setError(null);
+    if (!token && !isPublicRoute) {
+      setLocation("/auth");
     }
-  }, [isEditorOpen, token]);
+  }, [token, isPublicRoute, setLocation]);
 
-  const saveToken = () => {
-    const trimmed = draftToken.trim();
-    if (!trimmed) {
-      setError("トークンを入力してください");
-      return;
+  useEffect(() => {
+    if (prevTokenRef.current !== token) {
+      queryClient.clear();
+      prevTokenRef.current = token;
     }
-
-    const parsed = decodeAuthToken(trimmed);
-    if (!parsed) {
-      setError("JWT形式のトークンではありません");
-      return;
-    }
-
-    setToken(trimmed);
-    setIsEditorOpen(false);
-    setError(null);
-  };
+  }, [token]);
 
   const logout = () => {
     setToken(null);
-    setIsEditorOpen(true);
+    setLocation("/auth");
   };
-
-  const overlay = (
-    <div className="demo-auth-overlay">
-      <div className="demo-auth-card">
-        <h2>デモ用トークンを設定</h2>
-        <p>
-          `/api/auth/register` または `/api/auth/login` で取得した JWT をペーストしてください。
-          ホスト・ゲスト双方のデモを切り替えてチャット体験を確認できます。
-        </p>
-        <ol>
-          <li>ターミナルなどから API を叩いてユーザーを作成</li>
-          <li>レスポンスの `token` をコピー</li>
-          <li>下のフィールドに貼り付けて保存</li>
-        </ol>
-        <textarea
-          value={draftToken}
-          onChange={(event) => setDraftToken(event.target.value)}
-          placeholder="eyJhbGciOiJIUzI1NiIs..."
-          rows={4}
-        />
-        {error && <p className="demo-auth-error">{error}</p>}
-        <div className="demo-auth-actions">
-          {token && (
-            <button type="button" className="ghost-btn" onClick={() => setIsEditorOpen(false)}>
-              キャンセル
-            </button>
-          )}
-          <button type="button" className="primary-btn" onClick={saveToken}>
-            保存する
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 
   const contextValue = useMemo(
     () => ({
@@ -102,31 +64,97 @@ export function DemoAuthGate({ children }: DemoAuthGateProps) {
     [token, user],
   );
 
-  if (!token) {
+  const profilePhotoKey = useMemo(() => ["/api/account/profile-photo", user?.userId ?? "anon"], [user?.userId]);
+  const {
+    data: profilePhoto,
+    refetch: refetchProfilePhoto,
+  } = useQuery<{ profilePhoto: string | null } | null>({
+    queryKey: profilePhotoKey,
+    enabled: Boolean(token && user?.userId),
+    queryFn: async () => {
+      const res = await fetch("/api/account/profile-photo", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(`${res.status}: ${res.statusText}`);
+      }
+      return (await res.json()) as { profilePhoto: string | null };
+    },
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+  });
+
+  const modeKey = useMemo(() => ["/api/account/mode", user?.userId ?? "anon"], [user?.userId]);
+  const { data: accountMode } = useQuery<{ preferredRole: "host" | "guest" | null } | null>({
+    queryKey: modeKey,
+    enabled: Boolean(token && user?.userId),
+    queryFn: async () => {
+      const res = await fetch("/api/account/mode", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(`${res.status}: ${res.statusText}`);
+      }
+      return (await res.json()) as { preferredRole: "host" | "guest" | null };
+    },
+  });
+
+  useEffect(() => {
+    if (token && accountMode && !accountMode.preferredRole && location !== "/mode") {
+      setLocation("/mode");
+    }
+  }, [token, accountMode, location, setLocation]);
+
+  useEffect(() => {
+    if (user?.userId) {
+      queryClient.removeQueries({ queryKey: ["/api/account/profile-photo"] });
+      queryClient.removeQueries({ queryKey: ["/api/account/mode"] });
+      refetchProfilePhoto();
+    }
+  }, [user?.userId, refetchProfilePhoto]);
+
+  if (!token && !isPublicRoute) {
     return (
       <AuthContext.Provider value={contextValue}>
-        {overlay}
+        <div />
       </AuthContext.Provider>
     );
   }
 
   return (
     <AuthContext.Provider value={contextValue}>
-      <div className="demo-auth-badge">
-        <div>
-          <strong>{user?.username ?? "Unknown"}</strong>
-          <span>{user?.role ? ` / ${user.role}` : ""}</span>
+      {token && (
+        <div className="demo-auth-badge" key={user?.userId ?? "anon"}>
+          {profilePhoto?.profilePhoto ? (
+            <div className="demo-auth-avatar">
+              <img src={profilePhoto.profilePhoto} alt="Profile" />
+            </div>
+          ) : (
+            <div className="demo-auth-avatar placeholder">No Photo</div>
+          )}
+          <div>
+            <strong>{user?.username ?? "Unknown"}</strong>
+          </div>
+          <div className="demo-auth-badge-actions">
+            <button type="button" className="ghost-btn" onClick={logout}>
+              ログアウト
+            </button>
+          </div>
         </div>
-        <div className="demo-auth-badge-actions">
-          <button type="button" className="ghost-btn" onClick={() => setIsEditorOpen(true)}>
-            トークン変更
-          </button>
-          <button type="button" className="ghost-btn" onClick={logout}>
-            ログアウト
-          </button>
-        </div>
-      </div>
-      {isEditorOpen && overlay}
+      )}
       {children}
     </AuthContext.Provider>
   );

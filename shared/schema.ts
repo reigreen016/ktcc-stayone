@@ -9,11 +9,81 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull(),
   walletAddress: text("wallet_address").notNull(),
+  profilePhoto: text("profile_photo"),
+  preferredRole: text("preferred_role"),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export const hostProfiles = pgTable("host_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  profilePhoto: text("profile_photo"),
+  nickname: text("nickname"),
+  location: text("location"),
+  bio: text("bio"),
+  hostExperience: text("host_experience"),
+  startYear: integer("start_year"),
+  totalHosted: integer("total_hosted"),
+  badges: jsonb("badges"),
+  languages: jsonb("languages"),
+  englishLevel: text("english_level"),
+  englishNote: text("english_note"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertHostProfileSchema = createInsertSchema(hostProfiles).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertHostProfile = z.infer<typeof insertHostProfileSchema>;
+export type HostProfile = typeof hostProfiles.$inferSelect;
+
+export const hostProperties = pgTable("host_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  title: text("title"),
+  address: text("address"),
+  nearestAccess: text("nearest_access"),
+  pricePerNight: integer("price_per_night"),
+  capacity: integer("capacity"),
+  amenities: text("amenities"),
+  availabilityDates: jsonb("availability_dates"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertHostPropertySchema = createInsertSchema(hostProperties).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertHostProperty = z.infer<typeof insertHostPropertySchema>;
+export type HostProperty = typeof hostProperties.$inferSelect;
+
+export const guestProfiles = pgTable("guest_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  profilePhoto: text("profile_photo"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  nationality: text("nationality"),
+  dateOfBirth: timestamp("date_of_birth"),
+  sex: text("sex"),
+  emergencyName: text("emergency_name"),
+  emergencyRelationship: text("emergency_relationship"),
+  emergencyPhone: text("emergency_phone"),
+  languageLevels: jsonb("language_levels"),
+  hostMessage: text("host_message"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertGuestProfileSchema = createInsertSchema(guestProfiles).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertGuestProfile = z.infer<typeof insertGuestProfileSchema>;
+export type GuestProfile = typeof guestProfiles.$inferSelect;
 
 export const bookingRequests = pgTable("booking_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

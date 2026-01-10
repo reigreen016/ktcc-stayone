@@ -87,6 +87,36 @@ function serializeMessage(message: Message): MessageResponse {
   };
 }
 
+function normalizeOptionalString(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeOptionalNumber(value?: number | null): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return Number.isFinite(value) ? value : null;
+}
+
+function normalizeOptionalArray(value?: string[] | null): string[] | null {
+  if (!value || value.length === 0) {
+    return null;
+  }
+  return value;
+}
+
+function normalizeOptionalDate(value?: string | null): Date | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -226,6 +256,44 @@ export async function registerRoutes(
     body: z.string().min(1).max(1000),
   });
 
+  const hostProfileSchema = z.object({
+    profilePhoto: z.string().optional().nullable(),
+    nickname: z.string().optional().nullable(),
+    location: z.string().optional().nullable(),
+    bio: z.string().optional().nullable(),
+    hostExperience: z.string().optional().nullable(),
+    startYear: z.number().int().optional().nullable(),
+    totalHosted: z.number().int().optional().nullable(),
+    badges: z.array(z.string()).optional().nullable(),
+    languages: z.array(z.string()).optional().nullable(),
+    englishLevel: z.string().optional().nullable(),
+    englishNote: z.string().optional().nullable(),
+  });
+
+  const hostPropertySchema = z.object({
+    title: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+    nearestAccess: z.string().optional().nullable(),
+    pricePerNight: z.number().int().optional().nullable(),
+    capacity: z.number().int().optional().nullable(),
+    amenities: z.string().optional().nullable(),
+    availabilityDates: z.array(z.string()).optional().nullable(),
+  });
+
+  const guestProfileSchema = z.object({
+    profilePhoto: z.string().optional().nullable(),
+    firstName: z.string().optional().nullable(),
+    lastName: z.string().optional().nullable(),
+    nationality: z.string().optional().nullable(),
+    dateOfBirth: z.string().optional().nullable(),
+    sex: z.string().optional().nullable(),
+    emergencyName: z.string().optional().nullable(),
+    emergencyRelationship: z.string().optional().nullable(),
+    emergencyPhone: z.string().optional().nullable(),
+    languageLevels: z.record(z.string()).optional().nullable(),
+    hostMessage: z.string().optional().nullable(),
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const data = insertUserSchema.parse(req.body);
@@ -243,6 +311,7 @@ export async function registerRoutes(
       const hashedPassword = await hashPassword(data.password);
       const user = await storage.createUser({
         ...data,
+        role: "member",
         password: hashedPassword,
       });
 
@@ -294,7 +363,7 @@ export async function registerRoutes(
       const token = generateToken({
         userId: user.id,
         username: user.username,
-        role: user.role,
+        role: "member",
         walletAddress: user.walletAddress,
       });
 
@@ -302,7 +371,7 @@ export async function registerRoutes(
         user: {
           id: user.id,
           username: user.username,
-          role: user.role,
+          role: "member",
           walletAddress: user.walletAddress,
         },
         token,
@@ -310,6 +379,175 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Login error:", error);
       return res.status(500).json({ message: "ログインに失敗しました" });
+    }
+  });
+
+  app.get("/api/account/profile-photo", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      res.set("Cache-Control", "no-store");
+      const profilePhoto = await storage.getUserProfilePhoto(req.user!.userId);
+      return res.status(200).json({ profilePhoto });
+    } catch (error) {
+      console.error("Get profile photo error:", error);
+      return res.status(500).json({ message: "プロフィール写真の取得に失敗しました" });
+    }
+  });
+
+  app.put("/api/account/profile-photo", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      res.set("Cache-Control", "no-store");
+      const payload = z.object({ profilePhoto: z.string().optional().nullable() }).parse(req.body);
+      const normalized = normalizeOptionalString(payload.profilePhoto);
+      const user = await storage.updateUserProfilePhoto(req.user!.userId, normalized);
+      return res.status(200).json({ profilePhoto: user?.profilePhoto ?? null });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "入力データが不正です", errors: error.errors });
+      }
+      console.error("Update profile photo error:", error);
+      return res.status(500).json({ message: "プロフィール写真の保存に失敗しました" });
+    }
+  });
+
+  app.get("/api/account/mode", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      res.set("Cache-Control", "no-store");
+      const preferredRole = await storage.getUserPreferredRole(req.user!.userId);
+      return res.status(200).json({ preferredRole });
+    } catch (error) {
+      console.error("Get account mode error:", error);
+      return res.status(500).json({ message: "利用モードの取得に失敗しました" });
+    }
+  });
+
+  app.put("/api/account/mode", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      res.set("Cache-Control", "no-store");
+      const payload = z
+        .object({ preferredRole: z.enum(["host", "guest"]).nullable() })
+        .parse(req.body);
+      const user = await storage.updateUserPreferredRole(req.user!.userId, payload.preferredRole);
+      return res.status(200).json({ preferredRole: user?.preferredRole ?? null });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "入力データが不正です", errors: error.errors });
+      }
+      console.error("Update account mode error:", error);
+      return res.status(500).json({ message: "利用モードの保存に失敗しました" });
+    }
+  });
+
+  app.get("/api/host/profile", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      const profile = await storage.getHostProfileByUserId(req.user!.userId);
+      return res.status(200).json(profile ?? null);
+    } catch (error) {
+      console.error("Get host profile error:", error);
+      return res.status(500).json({ message: "ホストプロフィールの取得に失敗しました" });
+    }
+  });
+
+  app.put("/api/host/profile", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      const payload = hostProfileSchema.parse(req.body);
+      if (payload.profilePhoto !== undefined) {
+        await storage.updateUserProfilePhoto(req.user!.userId, normalizeOptionalString(payload.profilePhoto));
+      }
+      const updates = {
+        nickname: normalizeOptionalString(payload.nickname),
+        location: normalizeOptionalString(payload.location),
+        bio: normalizeOptionalString(payload.bio),
+        hostExperience: normalizeOptionalString(payload.hostExperience),
+        startYear: normalizeOptionalNumber(payload.startYear),
+        totalHosted: normalizeOptionalNumber(payload.totalHosted),
+        badges: normalizeOptionalArray(payload.badges),
+        languages: normalizeOptionalArray(payload.languages),
+        englishLevel: normalizeOptionalString(payload.englishLevel),
+        englishNote: normalizeOptionalString(payload.englishNote),
+      };
+      const saved = await storage.upsertHostProfile(req.user!.userId, updates);
+      await logAudit("host_profile", saved.id, "UPDATED", req.user!.userId, null, saved);
+      return res.status(200).json(saved);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "入力データが不正です", errors: error.errors });
+      }
+      console.error("Update host profile error:", error);
+      return res.status(500).json({ message: "ホストプロフィールの保存に失敗しました" });
+    }
+  });
+
+  app.get("/api/host/property", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      const property = await storage.getHostPropertyByUserId(req.user!.userId);
+      return res.status(200).json(property ?? null);
+    } catch (error) {
+      console.error("Get host property error:", error);
+      return res.status(500).json({ message: "物件情報の取得に失敗しました" });
+    }
+  });
+
+  app.put("/api/host/property", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      const payload = hostPropertySchema.parse(req.body);
+      const updates = {
+        title: normalizeOptionalString(payload.title),
+        address: normalizeOptionalString(payload.address),
+        nearestAccess: normalizeOptionalString(payload.nearestAccess),
+        pricePerNight: normalizeOptionalNumber(payload.pricePerNight),
+        capacity: normalizeOptionalNumber(payload.capacity),
+        amenities: normalizeOptionalString(payload.amenities),
+        availabilityDates: normalizeOptionalArray(payload.availabilityDates),
+      };
+      const saved = await storage.upsertHostProperty(req.user!.userId, updates);
+      await logAudit("host_property", saved.id, "UPDATED", req.user!.userId, null, saved);
+      return res.status(200).json(saved);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "入力データが不正です", errors: error.errors });
+      }
+      console.error("Update host property error:", error);
+      return res.status(500).json({ message: "物件情報の保存に失敗しました" });
+    }
+  });
+
+  app.get("/api/guest/profile", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      const profile = await storage.getGuestProfileByUserId(req.user!.userId);
+      return res.status(200).json(profile ?? null);
+    } catch (error) {
+      console.error("Get guest profile error:", error);
+      return res.status(500).json({ message: "ゲストプロフィールの取得に失敗しました" });
+    }
+  });
+
+  app.put("/api/guest/profile", authMiddleware, requireRole("host", "guest", "member"), async (req, res) => {
+    try {
+      const payload = guestProfileSchema.parse(req.body);
+      if (payload.profilePhoto !== undefined) {
+        await storage.updateUserProfilePhoto(req.user!.userId, normalizeOptionalString(payload.profilePhoto));
+      }
+      const updates = {
+        firstName: normalizeOptionalString(payload.firstName),
+        lastName: normalizeOptionalString(payload.lastName),
+        nationality: normalizeOptionalString(payload.nationality),
+        dateOfBirth: normalizeOptionalDate(payload.dateOfBirth),
+        sex: normalizeOptionalString(payload.sex),
+        emergencyName: normalizeOptionalString(payload.emergencyName),
+        emergencyRelationship: normalizeOptionalString(payload.emergencyRelationship),
+        emergencyPhone: normalizeOptionalString(payload.emergencyPhone),
+        languageLevels: payload.languageLevels ?? null,
+        hostMessage: normalizeOptionalString(payload.hostMessage),
+      };
+      const saved = await storage.upsertGuestProfile(req.user!.userId, updates);
+      await logAudit("guest_profile", saved.id, "UPDATED", req.user!.userId, null, saved);
+      return res.status(200).json(saved);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "入力データが不正です", errors: error.errors });
+      }
+      console.error("Update guest profile error:", error);
+      return res.status(500).json({ message: "ゲストプロフィールの保存に失敗しました" });
     }
   });
 
