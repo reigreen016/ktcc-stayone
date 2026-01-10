@@ -41,6 +41,7 @@ type HostPropertyForm = {
   pricePerNight: string;
   capacity: string;
   amenities: string;
+  photos: string[];
 };
 
 type HostProfileResponse = {
@@ -77,6 +78,7 @@ type HostPropertyResponse = {
   pricePerNight: number | null;
   capacity: number | null;
   amenities: string | null;
+  photos: string[] | null;
   availabilityDates: string[] | null;
   updatedAt: string;
 };
@@ -193,6 +195,7 @@ export default function HostDashboard() {
     pricePerNight: "",
     capacity: "",
     amenities: "",
+    photos: [],
   });
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDates, setSelectedDates] = useState<Set<string>>(
@@ -275,6 +278,7 @@ export default function HostDashboard() {
       pricePerNight: "",
       capacity: "",
       amenities: "",
+      photos: [],
     });
     setSelectedDates(new Set<string>());
   }, [viewerId]);
@@ -374,6 +378,7 @@ export default function HostDashboard() {
         pricePerNight: hostProperty.pricePerNight?.toString() ?? "",
         capacity: hostProperty.capacity?.toString() ?? "",
         amenities: hostProperty.amenities ?? "",
+        photos: hostProperty.photos ?? [],
       });
       setSelectedDates(new Set(hostProperty.availabilityDates ?? []));
       setIsPropertyEditing(false);
@@ -588,8 +593,49 @@ export default function HostDashboard() {
       pricePerNight: Number.isFinite(pricePerNight) ? pricePerNight : null,
       capacity: Number.isFinite(capacity) ? capacity : null,
       amenities: propertyForm.amenities,
+      photos: propertyForm.photos,
       availabilityDates: Array.from(selectedDates),
     });
+  };
+
+  const handlePropertyPhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isPropertyEditing) {
+      return;
+    }
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+    const availableSlots = Math.max(0, 3 - propertyForm.photos.length);
+    const nextFiles = files.slice(0, availableSlots);
+    if (nextFiles.length === 0) {
+      return;
+    }
+    nextFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setPropertyForm((prev) => {
+            if (prev.photos.length >= 3) {
+              return prev;
+            }
+            return { ...prev, photos: [...prev.photos, reader.result as string] };
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    event.target.value = "";
+  };
+
+  const handleRemovePropertyPhoto = (index: number) => {
+    if (!isPropertyEditing) {
+      return;
+    }
+    setPropertyForm((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index),
+    }));
   };
 
   useChatEvents((event) => {
@@ -1003,6 +1049,38 @@ export default function HostDashboard() {
         </div>
         <div className={isPropertyEditing ? "profile-card" : "profile-card is-saved"}>
           <h3 className="profile-card-title">基本情報</h3>
+          <div className="form-group">
+            <label>物件写真（最大3枚）</label>
+            <div className="property-photos">
+              <div className="photo-grid">
+                {propertyForm.photos.map((photo, index) => (
+                  <div key={`property-photo-${index}`} className="photo-tile">
+                    <img src={photo} alt={`Property ${index + 1}`} />
+                    {isPropertyEditing && (
+                      <button
+                        type="button"
+                        className="photo-remove"
+                        onClick={() => handleRemovePropertyPhoto(index)}
+                      >
+                        削除
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {propertyForm.photos.length < 3 && (
+                  <label className="photo-upload">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePropertyPhotoChange}
+                      disabled={!isPropertyEditing}
+                    />
+                    写真を追加
+                  </label>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="form-group">
             <label>物件タイトル</label>
             <input

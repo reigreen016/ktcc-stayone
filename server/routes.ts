@@ -277,6 +277,7 @@ export async function registerRoutes(
     pricePerNight: z.number().int().optional().nullable(),
     capacity: z.number().int().optional().nullable(),
     amenities: z.string().optional().nullable(),
+    photos: z.array(z.string()).max(3).optional().nullable(),
     availabilityDates: z.array(z.string()).optional().nullable(),
   });
 
@@ -497,6 +498,7 @@ export async function registerRoutes(
         pricePerNight: normalizeOptionalNumber(payload.pricePerNight),
         capacity: normalizeOptionalNumber(payload.capacity),
         amenities: normalizeOptionalString(payload.amenities),
+        photos: normalizeOptionalArray(payload.photos),
         availabilityDates: normalizeOptionalArray(payload.availabilityDates),
       };
       const saved = await storage.upsertHostProperty(req.user!.userId, updates);

@@ -50,6 +50,7 @@ export const hostProperties = pgTable("host_properties", {
   pricePerNight: integer("price_per_night"),
   capacity: integer("capacity"),
   amenities: text("amenities"),
+  photos: jsonb("photos"),
   availabilityDates: jsonb("availability_dates"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
