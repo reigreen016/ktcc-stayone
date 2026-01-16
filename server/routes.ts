@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authMiddleware, requireRole, hashPassword, verifyPassword, generateToken, verifyToken } from "./auth";
+import { tokenAdapter } from "./tokenAdapter";
 import {
   insertUserSchema,
   insertBookingRequestSchema,
@@ -298,7 +299,7 @@ export async function registerRoutes(
   app.post("/api/auth/register", async (req, res) => {
     try {
       const data = insertUserSchema.parse(req.body);
-      
+
       const existingUser = await storage.getUserByUsername(data.username);
       if (existingUser) {
         return res.status(400).json({ message: "ユーザー名は既に使用されています" });
@@ -346,7 +347,7 @@ export async function registerRoutes(
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      
+
       if (!username || !password) {
         return res.status(400).json({ message: "ユーザー名とパスワードが必要です" });
       }
@@ -556,7 +557,7 @@ export async function registerRoutes(
   app.post("/api/booking-requests", authMiddleware, requireRole("guest"), async (req, res) => {
     try {
       const data = insertBookingRequestSchema.parse(req.body);
-      
+
       const host = await storage.getUser(data.hostId);
       if (!host || host.role !== "host") {
         return res.status(400).json({ message: "ホストが見つかりません" });
@@ -583,7 +584,7 @@ export async function registerRoutes(
     try {
       const { id } = req.params;
       const bookingRequest = await storage.getBookingRequest(id);
-      
+
       if (!bookingRequest) {
         return res.status(404).json({ message: "予約リクエストが見つかりません" });
       }
@@ -620,7 +621,7 @@ export async function registerRoutes(
     try {
       const { id } = req.params;
       const bookingRequest = await storage.getBookingRequest(id);
-      
+
       if (!bookingRequest) {
         return res.status(404).json({ message: "予約リクエストが見つかりません" });
       }
@@ -760,7 +761,7 @@ export async function registerRoutes(
   app.post("/api/payments/prepare", authMiddleware, requireRole("guest"), async (req, res) => {
     try {
       const { bookingRequestId } = req.body;
-      
+
       if (!bookingRequestId) {
         return res.status(400).json({ message: "bookingRequestId が必要です" });
       }
@@ -817,7 +818,7 @@ export async function registerRoutes(
   app.post("/api/webhooks/jpyc/payment-completed", async (req, res) => {
     try {
       const { txHash, paymentId } = req.body;
-      
+
       if (!txHash || !paymentId) {
         return res.status(400).json({ message: "txHash と paymentId が必要です" });
       }
@@ -862,7 +863,7 @@ export async function registerRoutes(
   app.post("/api/stays/:bookingRequestId/complete", authMiddleware, requireRole("guest", "host"), async (req, res) => {
     try {
       const { bookingRequestId } = req.params;
-      
+
       const bookingRequest = await storage.getBookingRequest(bookingRequestId);
       if (!bookingRequest) {
         return res.status(404).json({ message: "予約が見つかりません" });
@@ -932,7 +933,7 @@ export async function registerRoutes(
   app.post("/api/webhooks/jpyc/fee-completed", async (req, res) => {
     try {
       const { txHash, feePaymentId } = req.body;
-      
+
       if (!txHash || !feePaymentId) {
         return res.status(400).json({ message: "txHash と feePaymentId が必要です" });
       }
@@ -966,7 +967,7 @@ export async function registerRoutes(
   app.post("/api/refunds", authMiddleware, requireRole("guest", "host"), async (req, res) => {
     try {
       const { bookingRequestId, faultType } = req.body;
-      
+
       if (!bookingRequestId || !faultType) {
         return res.status(400).json({ message: "bookingRequestId と faultType が必要です" });
       }
@@ -1028,7 +1029,7 @@ export async function registerRoutes(
   app.post("/api/webhooks/jpyc/refund-completed", async (req, res) => {
     try {
       const { txHash, refundId } = req.body;
-      
+
       if (!txHash || !refundId) {
         return res.status(400).json({ message: "txHash と refundId が必要です" });
       }
@@ -1040,7 +1041,7 @@ export async function registerRoutes(
 
       const refunds = await storage.getRefundsByBookingRequest(refundId);
       const refund = refunds.find(r => r.id === refundId);
-      
+
       if (!refund) {
         return res.status(404).json({ message: "返金が見つかりません" });
       }
@@ -1064,7 +1065,7 @@ export async function registerRoutes(
   app.post("/api/policies", authMiddleware, requireRole("operator"), async (req, res) => {
     try {
       const data = insertPolicySchema.parse(req.body);
-      
+
       const existingPolicy = await storage.getPolicyByName(data.name);
       if (existingPolicy) {
         const updated = await storage.updatePolicy(data.name, data.config);
@@ -1111,6 +1112,248 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Get audit logs error:", error);
       return res.status(500).json({ message: "監査ログの取得に失敗しました" });
+    }
+  });
+
+  // -------------------------
+  // JPYC Token API
+  // -------------------------
+  tokenAdapter.initialize().catch(console.error);
+
+  app.get("/api/token/accounts", async (_req, res) => {
+    try {
+      if (!tokenAdapter.isInitialized()) {
+        await tokenAdapter.initialize();
+      }
+      const accounts = await tokenAdapter.getAccounts();
+      return res.status(200).json({
+        accounts,
+        contractAddress: tokenAdapter.getContractAddress(),
+      });
+    } catch (error) {
+      console.error("Get accounts error:", error);
+      return res.status(500).json({ accounts: [], contractAddress: "" });
+    }
+  });
+
+  app.get("/api/token/balance", async (req, res) => {
+    try {
+      const address = req.query.address as string;
+      if (!address) {
+        return res.status(400).json({ success: false, message: "address query parameter required" });
+      }
+      if (!tokenAdapter.isInitialized()) {
+        await tokenAdapter.initialize();
+      }
+      const balance = await tokenAdapter.getBalance(address);
+      return res.status(200).json({
+        success: true,
+        address,
+        balance,
+        contractAddress: tokenAdapter.getContractAddress(),
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post("/api/token/mint", async (req, res) => {
+    try {
+      const { to, amount } = req.body;
+      if (!to || !amount) {
+        return res.status(400).json({ success: false, message: "to と amount が必要です" });
+      }
+      const result = await tokenAdapter.mint(to, amount);
+
+      if (result.success && result.receipt) {
+        // DB書き込みは失敗してもミント自体は成功
+        try {
+          await storage.createTransactionLog({
+            type: "mint",
+            fromWallet: "0x0000000000000000000000000000000000000000",
+            toWallet: to,
+            amount: amount,
+            txHash: result.txHash!,
+            blockNumber: result.receipt.blockNumber,
+            gasUsed: result.receipt.gasUsed,
+            status: result.receipt.status,
+          });
+        } catch (dbError) {
+          console.warn("[TokenAPI] Failed to log transaction to DB:", dbError);
+        }
+      }
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error: any) {
+      console.error("[TokenAPI] Mint error:", error);
+      return res.status(500).json({ success: false, message: error.message || "Unknown error" });
+    }
+  });
+
+  app.post("/api/token/transfer", async (req, res) => {
+    try {
+      const { from, to, amount } = req.body;
+      if (!from || !to || !amount) {
+        return res.status(400).json({ success: false, message: "from, to, amount が必要です" });
+      }
+      const result = await tokenAdapter.transfer(from, to, amount);
+
+      if (result.success && result.receipt) {
+        try {
+          await storage.createTransactionLog({
+            type: "transfer",
+            fromWallet: from,
+            toWallet: to,
+            amount: amount,
+            txHash: result.txHash!,
+            blockNumber: result.receipt.blockNumber,
+            gasUsed: result.receipt.gasUsed,
+            status: result.receipt.status,
+          });
+        } catch (dbError) {
+          console.warn("[TokenAPI] Failed to log transaction to DB:", dbError);
+        }
+      }
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error: any) {
+      console.error("[TokenAPI] Transfer error:", error);
+      return res.status(500).json({ success: false, message: error.message || "Unknown error" });
+    }
+  });
+
+  app.get("/api/token/transactions", async (_req, res) => {
+    try {
+      const transactions = await storage.getRecentTransactions(10);
+      return res.status(200).json({ success: true, transactions });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message, transactions: [] });
+    }
+  });
+
+  // Demo/Flow mode API
+  app.get("/api/demo/status", async (_req, res) => {
+    try {
+      const flowMode = await storage.getFlowMode();
+      return res.status(200).json({ success: true, flowMode });
+    } catch (error: any) {
+      return res.status(200).json({ success: true, flowMode: "payment" });
+    }
+  });
+
+  const flowModeBodySchema = z.object({
+    flowMode: z.enum(["payment", "refund_host_fault", "refund_guest_fault"]),
+  });
+
+  app.post("/api/demo/flow-mode", async (req, res) => {
+    try {
+      const { flowMode } = flowModeBodySchema.parse(req.body);
+      const state = await storage.setFlowMode(flowMode);
+      return res.status(200).json({ success: true, flowMode: state.flowMode });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: "Invalid flow mode", errors: error.errors });
+      }
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Payment execution API
+  const FEE_RATE = 0.15;
+  const REFUND_RATE = 0.5;
+
+  const paymentExecuteSchema = z.object({
+    bookingRequestId: z.string().min(1),
+  });
+
+  app.post("/api/payments/execute", authMiddleware, async (req, res) => {
+    try {
+      const { bookingRequestId } = paymentExecuteSchema.parse(req.body);
+
+      const booking = await storage.getBookingRequest(bookingRequestId);
+      if (!booking) {
+        return res.status(404).json({ success: false, message: "予約が見つかりません" });
+      }
+
+      if (booking.guestId !== req.user!.userId) {
+        return res.status(403).json({ success: false, message: "この予約の決済権限がありません" });
+      }
+
+      if (booking.status !== "APPROVED") {
+        return res.status(400).json({ success: false, message: "承認済みの予約のみ決済できます" });
+      }
+
+      // Check for existing payment (idempotency)
+      const existingPayment = await storage.getPaymentByBookingRequest(bookingRequestId);
+      if (existingPayment && existingPayment.status === "COMPLETED") {
+        return res.status(409).json({ success: false, message: "この予約は既に決済済みです" });
+      }
+
+      const guest = await storage.getUser(booking.guestId);
+      const host = await storage.getUser(booking.hostId);
+      if (!guest || !host) {
+        return res.status(500).json({ success: false, message: "ユーザー情報の取得に失敗しました" });
+      }
+
+      const amount = String(booking.totalAmount);
+
+      // Execute transfer
+      const tx = await tokenAdapter.transfer(guest.walletAddress, host.walletAddress, amount);
+      if (!tx.success) {
+        return res.status(400).json({ success: false, message: tx.message || "決済に失敗しました" });
+      }
+
+      // Create/update payment record
+      let payment = existingPayment;
+      if (!payment) {
+        payment = await storage.createPayment({
+          bookingRequestId,
+          fromWallet: guest.walletAddress,
+          toWallet: host.walletAddress,
+          amount: amount,
+          status: "COMPLETED",
+          txHash: tx.txHash || null,
+        });
+      } else {
+        payment = await storage.updatePaymentStatus(payment.id, "COMPLETED", tx.txHash);
+      }
+
+      // Update booking status
+      await storage.updateBookingRequestStatus(bookingRequestId, "PREPAID");
+
+      // Log transaction
+      if (tx.receipt) {
+        await storage.createTransactionLog({
+          type: "payment",
+          fromWallet: guest.walletAddress,
+          toWallet: host.walletAddress,
+          amount: amount,
+          txHash: tx.txHash!,
+          blockNumber: tx.receipt.blockNumber,
+          gasUsed: tx.receipt.gasUsed,
+          status: tx.receipt.status,
+        });
+      }
+
+      await logAudit("payment", bookingRequestId, "PAYMENT_COMPLETED", req.user!.userId, null, {
+        txHash: tx.txHash,
+        amount,
+        from: guest.walletAddress,
+        to: host.walletAddress,
+      }, tx.txHash);
+
+      return res.status(200).json({
+        success: true,
+        txHash: tx.txHash,
+        message: `決済完了（Guest → Host） ${amount} dJPY`,
+        payment,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: "入力が不正です", errors: error.errors });
+      }
+      console.error("Payment execute error:", error);
+      return res.status(500).json({ success: false, message: error.message || "internal error" });
     }
   });
 

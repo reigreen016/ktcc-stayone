@@ -9,11 +9,12 @@ import { useAuth } from "@/context/auth-context";
 import { useLocation } from "wouter";
 import type { ChatMessage, ConversationSummary } from "@/types/chat";
 import { toast } from "@/hooks/use-toast";
+import { PaymentPanel } from "@/components/PaymentPanel";
 import "./host-dashboard.css";
 import "./guest-dashboard.css";
 import "./guest-profile.css";
 
-type TabKey = "profile" | "message";
+type TabKey = "profile" | "message" | "payment";
 
 type LanguageLevels = {
   jp: string;
@@ -64,6 +65,7 @@ type GuestProfilePayload = {
 const tabs: { id: TabKey; label: string }[] = [
   { id: "profile", label: "プロフィール" },
   { id: "message", label: "メッセージ" },
+  { id: "payment", label: "決済" },
 ];
 
 const levelScale = [
@@ -539,29 +541,29 @@ export default function GuestDashboard() {
           </p>
         </header>
 
-          <div className={isProfileEditing ? "guest-card" : "guest-card is-saved"}>
-            <div className="card-title">Profile Photo</div>
-            <div className="avatar-wrap">
-              <div className="avatar-preview">
-                {profileForm.profilePhoto ? (
-                  <img src={profileForm.profilePhoto} alt="Guest profile" />
-                ) : (
-                  "Your Photo"
-                )}
-              </div>
-              <div className="avatar-actions">
-                <label className="avatar-upload">
-                  <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={!isProfileEditing} />
-                  写真を選択
-                </label>
-                {profileForm.profilePhoto && (
-                  <button type="button" className="avatar-remove" onClick={handleRemovePhoto}>
-                    写真を削除
-                  </button>
-                )}
-              </div>
+        <div className={isProfileEditing ? "guest-card" : "guest-card is-saved"}>
+          <div className="card-title">Profile Photo</div>
+          <div className="avatar-wrap">
+            <div className="avatar-preview">
+              {profileForm.profilePhoto ? (
+                <img src={profileForm.profilePhoto} alt="Guest profile" />
+              ) : (
+                "Your Photo"
+              )}
+            </div>
+            <div className="avatar-actions">
+              <label className="avatar-upload">
+                <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={!isProfileEditing} />
+                写真を選択
+              </label>
+              {profileForm.profilePhoto && (
+                <button type="button" className="avatar-remove" onClick={handleRemovePhoto}>
+                  写真を削除
+                </button>
+              )}
             </div>
           </div>
+        </div>
 
         <div className={isProfileEditing ? "guest-card" : "guest-card is-saved"}>
           <div className="card-title">Basic Information</div>
@@ -816,6 +818,24 @@ export default function GuestDashboard() {
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      <section
+        className={activeTab === "payment" ? "tab-content active" : "tab-content"}
+        id="payment"
+      >
+        <div className="section-title">決済</div>
+        <div style={{ maxWidth: "500px", margin: "0 auto" }}>
+          <PaymentPanel
+            totalAmount="10000"
+            onPaymentComplete={(txHash) => {
+              toast({
+                title: "決済が完了しました",
+                description: `トランザクション: ${txHash.slice(0, 16)}...`,
+              });
+            }}
+          />
         </div>
       </section>
     </PageLayout>
