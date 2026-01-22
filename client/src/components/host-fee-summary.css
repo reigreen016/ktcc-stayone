@@ -1,0 +1,178 @@
+.fee-summary-page {
+    padding: 0;
+}
+
+.fee-loading,
+.fee-empty {
+    padding: 2rem;
+    text-align: center;
+    color: #666;
+}
+
+/* Main Amount Card */
+.fee-main-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.fee-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.fee-card-label {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.fee-card-month {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.fee-card-amount {
+    margin-bottom: 1rem;
+}
+
+.fee-card-value {
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.fee-card-unit {
+    font-size: 20px;
+    font-weight: 500;
+    margin-left: 8px;
+    opacity: 0.9;
+}
+
+.fee-card-subtext {
+    font-size: 13px;
+    opacity: 0.85;
+}
+
+/* Details Grid */
+.fee-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.fee-detail-card {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.fee-detail-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.fee-detail-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+}
+
+.fee-detail-value.highlight {
+    color: #e53935;
+}
+
+/* Action Section */
+.fee-action-section {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.fee-action-note {
+    font-size: 13px;
+    color: #666;
+    margin: 0 0 1rem 0;
+    line-height: 1.6;
+}
+
+.fee-settle-button {
+    width: 100%;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transition: all 0.2s;
+}
+
+.fee-settle-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.fee-settle-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Info Section */
+.fee-info-section {
+    background: #e3f2fd;
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+
+.fee-info-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1565c0;
+    margin: 0 0 0.75rem 0;
+}
+
+.fee-info-section ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.fee-info-section li {
+    font-size: 13px;
+    color: #1976d2;
+    margin-bottom: 0.4rem;
+    line-height: 1.5;
+}
+
+.fee-info-section li:last-child {
+    margin-bottom: 0;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .fee-details-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .fee-card-value {
+        font-size: 36px;
+    }
+
+    .fee-card-header {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}

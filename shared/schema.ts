@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -52,6 +52,7 @@ export const hostProperties = pgTable("host_properties", {
   amenities: text("amenities"),
   photos: jsonb("photos"),
   availabilityDates: jsonb("availability_dates"),
+  isPublished: boolean("is_published").default(false).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -101,6 +102,7 @@ export const bookingRequests = pgTable("booking_requests", {
 
 export const insertBookingRequestSchema = createInsertSchema(bookingRequests).omit({
   id: true,
+  guestId: true,
   createdAt: true,
   updatedAt: true,
   status: true

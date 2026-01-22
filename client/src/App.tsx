@@ -5,11 +5,14 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DemoAuthGate } from "@/components/demo-auth-gate";
+import { LanguageProvider } from "@/context/language-context";
 import NotFound from "@/pages/not-found";
 import HostDashboard from "@/pages/HostDashboard";
 import Auth from "@/pages/Auth";
 import GuestDashboard from "@/pages/GuestDashboard";
 import ModeSelect from "@/pages/ModeSelect";
+import PropertySelect from "@/pages/PropertySelect";
+import AdminPayment from "@/pages/AdminPayment";
 
 function SignupRedirect() {
   const [, setLocation] = useLocation();
@@ -37,6 +40,8 @@ function Router() {
       <Route path="/" component={HostDashboard} />
       <Route path="/auth" component={Auth} />
       <Route path="/mode" component={ModeSelect} />
+      <Route path="/properties" component={PropertySelect} />
+      <Route path="/admin/payment" component={AdminPayment} />
       <Route path="/signup" component={SignupRedirect} />
       <Route path="/login" component={SignupRedirect} />
       <Route path="/host/signup" component={SignupRedirect} />
@@ -53,12 +58,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <DemoAuthGate>
-          <Router />
-        </DemoAuthGate>
-      </TooltipProvider>
+      <LanguageProvider>
+        <TooltipProvider>
+          <Toaster />
+          <DemoAuthGate>
+            <Router />
+          </DemoAuthGate>
+        </TooltipProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }
