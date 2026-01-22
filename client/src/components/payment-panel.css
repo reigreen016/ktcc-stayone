@@ -1,0 +1,341 @@
+.payment-panel {
+    padding: 1rem;
+}
+
+.payment-status {
+    background: #f5f5f5;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.status-row:last-child {
+    border-bottom: none;
+}
+
+.status-label {
+    font-size: 13px;
+    color: #666;
+    font-weight: 500;
+}
+
+.status-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.status-value.running {
+    color: #2e7d32;
+}
+
+.status-value.stopped {
+    color: #c62828;
+}
+
+.status-value.balance {
+    color: #1976d2;
+    font-size: 16px;
+}
+
+.status-value.flow-payment {
+    color: #1976d2;
+}
+
+.status-value.flow-refund_host_fault {
+    color: #d32f2f;
+}
+
+.status-value.flow-refund_guest_fault {
+    color: #ed6c02;
+}
+
+.payment-actions {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.action-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+}
+
+.account-select {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #cfd8dc;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.account-select:disabled {
+    background: #f5f5f5;
+    color: #999;
+}
+
+.connect-btn {
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    transition: opacity 0.2s;
+}
+
+.connect-btn:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.connect-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.connect-btn.connected {
+    background: #4caf50;
+    opacity: 1;
+}
+
+.payment-info {
+    background: #e3f2fd;
+    border-radius: 10px;
+    padding: 1rem;
+    font-size: 13px;
+    color: #1565c0;
+}
+
+.payment-info p {
+    margin: 0.25rem 0;
+}
+
+/* Admin Page */
+.admin-page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.admin-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.admin-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.admin-header p {
+    color: #6b7280;
+}
+
+.admin-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.admin-section h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.accounts-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.account-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.account-name {
+    font-weight: 600;
+    color: #374151;
+}
+
+.account-address {
+    font-size: 12px;
+    color: #9ca3af;
+    font-family: monospace;
+}
+
+.account-balance {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #059669;
+}
+
+.mint-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.form-field input,
+.form-field select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.admin-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.admin-btn.primary {
+    background: #6366f1;
+    color: white;
+}
+
+.admin-btn.primary:hover:not(:disabled) {
+    background: #4f46e5;
+}
+
+.admin-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Fee Summary Card */
+.fee-summary-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: white;
+    text-align: center;
+}
+
+.fee-summary-title {
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0.9;
+    margin: 0 0 0.25rem 0;
+}
+
+.fee-summary-month {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.fee-summary-amount {
+    margin-bottom: 1.5rem;
+}
+
+.fee-amount-value {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.fee-amount-unit {
+    font-size: 18px;
+    font-weight: 500;
+    margin-left: 6px;
+    opacity: 0.9;
+}
+
+.fee-summary-details {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.fee-detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+    font-size: 13px;
+}
+
+.fee-detail-row span:first-child {
+    opacity: 0.85;
+}
+
+.fee-detail-row span:last-child {
+    font-weight: 600;
+}
+
+.fee-summary-warning {
+    background: rgba(255, 193, 7, 0.3);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.fee-settle-btn {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.95);
+    color: #667eea;
+    transition: all 0.2s;
+}
+
+.fee-settle-btn:hover:not(:disabled) {
+    background: white;
+    transform: translateY(-1px);
+}
+
+.fee-settle-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

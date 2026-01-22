@@ -1,14 +1,71 @@
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useEffect, useState, type FormEvent } from "react";
 import { PageLayout } from "@/components/layout/SiteChrome";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/context/auth-context";
+import { useLanguage } from "@/context/language-context";
 import "./host-signup.css";
 
 type AuthMode = "login" | "signup";
 
+const translations = {
+  ja: {
+    pill: "ログイン / 登録",
+    title: "Stay One アカウント",
+    description: "1つのアカウントでホスト・ゲスト双方の機能を利用できます。",
+    login: "ログイン",
+    signup: "新規登録",
+    username: "ユーザー名",
+    usernamePlaceholder: "例）stayone_user",
+    walletAddress: "ウォレットアドレス",
+    password: "パスワード",
+    passwordPlaceholder: "パスワード",
+    passwordPlaceholderSignup: "8文字以上",
+    confirmPassword: "パスワード（確認）",
+    confirmPasswordPlaceholder: "もう一度入力してください",
+    submitting: "送信中...",
+    register: "登録する",
+    alreadyMember: "既にメンバーの方は",
+    loginHere: "ログインはこちら",
+    noAccount: "アカウントをお持ちでない方は",
+    signupHere: "新規登録はこちら",
+    errorUsernamePassword: "ユーザー名とパスワードを入力してください。",
+    errorWallet: "ウォレットアドレスを入力してください。",
+    errorConfirmPassword: "確認用パスワードを入力してください。",
+    errorPasswordMismatch: "パスワードが一致しません。",
+    errorAuth: "認証に失敗しました。",
+  },
+  en: {
+    pill: "Login / Register",
+    title: "Stay One Account",
+    description: "Access both host and guest features with a single account.",
+    login: "Login",
+    signup: "Sign Up",
+    username: "Username",
+    usernamePlaceholder: "e.g. stayone_user",
+    walletAddress: "Wallet Address",
+    password: "Password",
+    passwordPlaceholder: "Password",
+    passwordPlaceholderSignup: "8+ characters",
+    confirmPassword: "Confirm Password",
+    confirmPasswordPlaceholder: "Enter password again",
+    submitting: "Submitting...",
+    register: "Register",
+    alreadyMember: "Already a member?",
+    loginHere: "Login here",
+    noAccount: "Don't have an account?",
+    signupHere: "Sign up here",
+    errorUsernamePassword: "Please enter username and password.",
+    errorWallet: "Please enter wallet address.",
+    errorConfirmPassword: "Please enter confirmation password.",
+    errorPasswordMismatch: "Passwords do not match.",
+    errorAuth: "Authentication failed.",
+  },
+};
+
 export default function Auth() {
   const { token, setToken } = useAuth();
+  const { lang } = useLanguage();
   const [, setLocation] = useLocation();
   const [mode, setMode] = useState<AuthMode>("login");
   const [username, setUsername] = useState("");
@@ -17,6 +74,8 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const t = translations[lang];
 
   useEffect(() => {
     if (token) {
@@ -31,21 +90,21 @@ export default function Auth() {
     resetErrors();
 
     if (!username.trim() || !password) {
-      setError("ユーザー名とパスワードを入力してください。");
+      setError(t.errorUsernamePassword);
       return;
     }
 
     if (mode === "signup") {
       if (!walletAddress.trim()) {
-        setError("ウォレットアドレスを入力してください。");
+        setError(t.errorWallet);
         return;
       }
       if (!confirmPassword) {
-        setError("確認用パスワードを入力してください。");
+        setError(t.errorConfirmPassword);
         return;
       }
       if (password !== confirmPassword) {
-        setError("パスワードが一致しません。");
+        setError(t.errorPasswordMismatch);
         return;
       }
     }
@@ -56,21 +115,21 @@ export default function Auth() {
       const payload =
         mode === "signup"
           ? {
-              username: username.trim(),
-              password,
-              role: "member",
-              walletAddress: walletAddress.trim(),
-            }
+            username: username.trim(),
+            password,
+            role: "member",
+            walletAddress: walletAddress.trim(),
+          }
           : {
-              username: username.trim(),
-              password,
-            };
+            username: username.trim(),
+            password,
+          };
       const res = await apiRequest("POST", endpoint, payload);
       const data = (await res.json()) as { token: string };
       setToken(data.token);
       setLocation("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "認証に失敗しました。");
+      setError(err instanceof Error ? err.message : t.errorAuth);
     } finally {
       setIsSubmitting(false);
     }
@@ -80,11 +139,9 @@ export default function Auth() {
     <PageLayout mainClassName="signup-main">
       <section className="signup-card">
         <div className="signup-headline">
-          <p className="signup-pill">ログイン / 登録</p>
-          <h1 className="signup-title">Stay One アカウント</h1>
-          <p className="signup-description">
-            1つのアカウントでホスト・ゲスト双方の機能を利用できます。
-          </p>
+          <p className="signup-pill">{t.pill}</p>
+          <h1 className="signup-title">{t.title}</h1>
+          <p className="signup-description">{t.description}</p>
         </div>
 
         <div className="auth-toggle">
@@ -93,23 +150,23 @@ export default function Auth() {
             className={mode === "login" ? "auth-tab active" : "auth-tab"}
             onClick={() => setMode("login")}
           >
-            ログイン
+            {t.login}
           </button>
           <button
             type="button"
             className={mode === "signup" ? "auth-tab active" : "auth-tab"}
             onClick={() => setMode("signup")}
           >
-            新規登録
+            {t.signup}
           </button>
         </div>
 
         <form className="signup-form" onSubmit={handleSubmit}>
           <div className="signup-form-group">
-            <label>ユーザー名</label>
+            <label>{t.username}</label>
             <input
               type="text"
-              placeholder="例）stayone_user"
+              placeholder={t.usernamePlaceholder}
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               autoComplete="username"
@@ -118,7 +175,7 @@ export default function Auth() {
 
           {mode === "signup" && (
             <div className="signup-form-group">
-              <label>ウォレットアドレス</label>
+              <label>{t.walletAddress}</label>
               <input
                 type="text"
                 placeholder="0x..."
@@ -130,10 +187,10 @@ export default function Auth() {
           )}
 
           <div className="signup-form-group">
-            <label>パスワード</label>
+            <label>{t.password}</label>
             <input
               type="password"
-              placeholder={mode === "signup" ? "8文字以上" : "パスワード"}
+              placeholder={mode === "signup" ? t.passwordPlaceholderSignup : t.passwordPlaceholder}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
@@ -142,10 +199,10 @@ export default function Auth() {
 
           {mode === "signup" && (
             <div className="signup-form-group">
-              <label>パスワード（確認）</label>
+              <label>{t.confirmPassword}</label>
               <input
                 type="password"
-                placeholder="もう一度入力してください"
+                placeholder={t.confirmPasswordPlaceholder}
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 autoComplete="new-password"
@@ -156,25 +213,24 @@ export default function Auth() {
           {error && <div className="signup-error">{error}</div>}
 
           <button type="submit" className="primary-btn signup-btn" disabled={isSubmitting}>
-            {isSubmitting ? "送信中..." : mode === "signup" ? "登録する" : "ログイン"}
+            {isSubmitting ? t.submitting : mode === "signup" ? t.register : t.login}
           </button>
           <p className="signup-note">
             {mode === "signup" ? (
               <>
-                既にメンバーの方は{" "}
+                {t.alreadyMember}{" "}
                 <button type="button" className="link-btn" onClick={() => setMode("login")}>
-                  ログインはこちら
+                  {t.loginHere}
                 </button>
               </>
             ) : (
               <>
-                アカウントをお持ちでない方は{" "}
+                {t.noAccount}{" "}
                 <button type="button" className="link-btn" onClick={() => setMode("signup")}>
-                  新規登録はこちら
+                  {t.signupHere}
                 </button>
               </>
             )}
-            {" "}または <Link href="/">トップへ戻る</Link>
           </p>
         </form>
       </section>

@@ -9,11 +9,13 @@ import { useAuth } from "@/context/auth-context";
 import { useLocation } from "wouter";
 import type { ChatMessage, ConversationSummary } from "@/types/chat";
 import { toast } from "@/hooks/use-toast";
+import { GuestPaymentPanel } from "@/components/GuestPaymentPanel";
+import "@/components/payment-panel.css";
 import "./host-dashboard.css";
 import "./guest-dashboard.css";
 import "./guest-profile.css";
 
-type TabKey = "profile" | "message";
+type TabKey = "profile" | "message" | "payment" | "properties";
 
 type LanguageLevels = {
   jp: string;
@@ -61,9 +63,10 @@ type GuestProfilePayload = {
   languageLevels?: LanguageLevels | null;
 };
 
-const tabs: { id: TabKey; label: string }[] = [
-  { id: "profile", label: "プロフィール" },
-  { id: "message", label: "メッセージ" },
+const tabs: { id: TabKey; label: string; href?: string }[] = [
+  { id: "profile", label: "Profile" },
+  { id: "message", label: "Messages" },
+  { id: "payment", label: "JPYC Payment" },
 ];
 
 const levelScale = [
@@ -86,7 +89,7 @@ function getConversationPartner(conversation: ConversationSummary, viewerId?: st
 function getStayTagline(conversation: ConversationSummary) {
   const checkIn = new Date(conversation.booking.checkInDate);
   const checkOut = new Date(conversation.booking.checkOutDate);
-  return `${format(checkIn, "M月d日")}〜${format(checkOut, "M月d日")} ／ ${conversation.booking.propertyId}`;
+  return `${format(checkIn, "MMM d")} - ${format(checkOut, "MMM d")} / ${conversation.booking.propertyId}`;
 }
 
 function normalizeSnippet(text: string) {
@@ -101,12 +104,12 @@ function getThreadSnippet(conversation: ConversationSummary) {
   if (conversation.lastMessage) {
     return normalizeSnippet(conversation.lastMessage.body);
   }
-  return "マッチング済み。滞在の確認事項を相談できます。";
+  return "Matched. You can discuss stay details.";
 }
 
 function getThreadTime(conversation: ConversationSummary) {
   if (!conversation.lastMessage) {
-    return "未送信";
+    return "Not sent";
   }
   const date = new Date(conversation.lastMessage.createdAt);
   return formatDistanceToNow(date, { addSuffix: true });
@@ -306,7 +309,7 @@ export default function GuestDashboard() {
       return (
         <Fragment key={message.id}>
           {showDivider && (
-            <div className="chat-date-divider">{format(createdAt, "M月d日")}</div>
+            <div className="chat-date-divider">{format(createdAt, "MMM d")}</div>
           )}
           <div className={`chat-row ${isMine ? "me-row" : ""}`}>
             <div className={`chat-bubble ${isMine ? "me" : "other"}`}>
@@ -352,7 +355,7 @@ export default function GuestDashboard() {
     },
     onError: (error: Error) => {
       toast({
-        title: "メッセージ送信に失敗しました",
+        title: "Failed to send message",
         description: error.message,
         variant: "destructive",
       });
@@ -369,12 +372,12 @@ export default function GuestDashboard() {
       setIsProfileEditing(false);
       setProfileSavedAt(saved.updatedAt ? new Date(saved.updatedAt) : new Date());
       toast({
-        title: "プロフィールを保存しました",
+        title: "Profile saved",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "プロフィールの保存に失敗しました",
+        title: "Failed to save profile",
         description: error.message,
         variant: "destructive",
       });
@@ -395,7 +398,7 @@ export default function GuestDashboard() {
     },
     onError: (error: Error) => {
       toast({
-        title: "プロフィール写真の保存に失敗しました",
+        title: "Failed to save photo",
         description: error.message,
         variant: "destructive",
       });
@@ -489,10 +492,21 @@ export default function GuestDashboard() {
 
   return (
     <PageLayout mainClassName="guest-main">
-      <div className="guest-page-title">ゲストマイページ</div>
-      <p className="guest-lead">
-        滞在前のプロフィール入力とホストとのチャットをひとつの画面で管理できます。
-      </p>
+      <div className="guest-page-header">
+        <div>
+          <div className="guest-page-title">Guest Dashboard</div>
+          <p className="guest-lead">
+            Manage your profile and communicate with hosts in one place.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="primary-btn find-property-btn"
+          onClick={() => setLocation("/properties")}
+        >
+          Find a Property
+        </button>
+      </div>
 
       <div className="tab-bar">
         {tabs.map((tab) => (
@@ -500,7 +514,13 @@ export default function GuestDashboard() {
             key={tab.id}
             type="button"
             className={activeTab === tab.id ? "tab-button active" : "tab-button"}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              if (tab.href) {
+                setLocation(tab.href);
+              } else {
+                setActiveTab(tab.id);
+              }
+            }}
           >
             {tab.label}
           </button>
@@ -512,9 +532,9 @@ export default function GuestDashboard() {
         id="profile"
       >
         <div className="section-title-row">
-          <div className="section-title">プロフィール</div>
+          <div className="section-title">Profile</div>
           <div className="section-controls">
-            {!isProfileEditing && <span className="section-saved">保存済み</span>}
+            {!isProfileEditing && <span className="section-saved">Saved</span>}
             {isProfileEditing ? (
               <button
                 type="button"
@@ -522,11 +542,11 @@ export default function GuestDashboard() {
                 onClick={handleSaveProfile}
                 disabled={saveProfileMutation.isPending}
               >
-                {saveProfileMutation.isPending ? "保存中..." : "保存する"}
+                {saveProfileMutation.isPending ? "Saving..." : "Save"}
               </button>
             ) : (
               <button type="button" className="ghost-btn" onClick={() => setIsProfileEditing(true)}>
-                編集する
+                Edit
               </button>
             )}
           </div>
@@ -535,33 +555,33 @@ export default function GuestDashboard() {
           <p className="guest-pill">Guest Web3 profile</p>
           <h1 className="guest-title">Guest Profile Setup</h1>
           <p className="guest-lead">
-            NFTベースの滞在証明やウォレット評価と連動しながら、ホストに伝えたい情報を整理します。
+            Set up your profile to connect with hosts. Your profile helps hosts understand your preferences.
           </p>
         </header>
 
-          <div className={isProfileEditing ? "guest-card" : "guest-card is-saved"}>
-            <div className="card-title">Profile Photo</div>
-            <div className="avatar-wrap">
-              <div className="avatar-preview">
-                {profileForm.profilePhoto ? (
-                  <img src={profileForm.profilePhoto} alt="Guest profile" />
-                ) : (
-                  "Your Photo"
-                )}
-              </div>
-              <div className="avatar-actions">
-                <label className="avatar-upload">
-                  <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={!isProfileEditing} />
-                  写真を選択
-                </label>
-                {profileForm.profilePhoto && (
-                  <button type="button" className="avatar-remove" onClick={handleRemovePhoto}>
-                    写真を削除
-                  </button>
-                )}
-              </div>
+        <div className={isProfileEditing ? "guest-card" : "guest-card is-saved"}>
+          <div className="card-title">Profile Photo</div>
+          <div className="avatar-wrap">
+            <div className="avatar-preview">
+              {profileForm.profilePhoto ? (
+                <img src={profileForm.profilePhoto} alt="Guest profile" />
+              ) : (
+                "Your Photo"
+              )}
+            </div>
+            <div className="avatar-actions">
+              <label className="avatar-upload">
+                <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={!isProfileEditing} />
+                Choose Photo
+              </label>
+              {profileForm.profilePhoto && (
+                <button type="button" className="avatar-remove" onClick={handleRemovePhoto}>
+                  Remove Photo
+                </button>
+              )}
             </div>
           </div>
+        </div>
 
         <div className={isProfileEditing ? "guest-card" : "guest-card is-saved"}>
           <div className="card-title">Basic Information</div>
@@ -661,7 +681,7 @@ export default function GuestDashboard() {
 
           <div className="lang-skill">
             <div className="lang-label">
-              Spoken Japanese <span className="lang-sub">日本語（会話）</span>
+              Spoken Japanese
             </div>
             <div className="level-scale">
               {levelScale.map((level) => (
@@ -682,7 +702,7 @@ export default function GuestDashboard() {
 
           <div className="lang-skill">
             <div className="lang-label">
-              Spoken English <span className="lang-sub">英語（会話）</span>
+              Spoken English
             </div>
             <div className="level-scale">
               {levelScale.map((level) => (
@@ -713,7 +733,7 @@ export default function GuestDashboard() {
         </div>
 
         <p className="guest-footnote">
-          プロフィールはStay Oneチェーン上のソウルバウンドトークンとしてホストと共有されます。
+          Your profile will be shared with hosts as a soulbound token on the Stay One chain.
         </p>
       </section>
 
@@ -721,23 +741,23 @@ export default function GuestDashboard() {
         className={activeTab === "message" ? "tab-content active" : "tab-content"}
         id="message"
       >
-        <div className="section-title">メッセージ</div>
+        <div className="section-title">Messages</div>
         <div className="message-layout">
           <aside className="thread-list">
             <div className="thread-search">
               <input
                 type="text"
-                placeholder="ホストを検索"
+                placeholder="Search hosts"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </div>
             <div className="thread-scroller">
               {isConversationLoading && conversations.length === 0 && (
-                <div className="thread-empty">チャットを読み込み中です…</div>
+                <div className="thread-empty">Loading chats...</div>
               )}
               {!isConversationLoading && filteredThreads.length === 0 && (
-                <div className="thread-empty">一致するスレッドがありません。</div>
+                <div className="thread-empty">No matching threads found.</div>
               )}
               {filteredThreads.map((thread) => {
                 const partner = getConversationPartner(thread, viewerId);
@@ -775,19 +795,19 @@ export default function GuestDashboard() {
                   </div>
                   <div className="chat-actions">
                     <button type="button" className="chat-action-btn">
-                      予約詳細
+                      Booking Details
                     </button>
                     <button type="button" className="chat-action-btn">
-                      支払い状況
+                      Payment Status
                     </button>
                   </div>
                 </header>
                 <div className="chat-body">
                   {isMessagesLoading ? (
-                    <div className="chat-body-loading">メッセージを読み込み中です…</div>
+                    <div className="chat-body-loading">Loading messages...</div>
                   ) : messages.length === 0 ? (
                     <div className="chat-empty-state">
-                      最初のメッセージを送って、滞在の相談を始めましょう。
+                      Send the first message to start discussing your stay.
                     </div>
                   ) : (
                     renderedMessages
@@ -796,7 +816,7 @@ export default function GuestDashboard() {
                 <form className="chat-input-area" onSubmit={handleSendMessage}>
                   <textarea
                     className="chat-input"
-                    placeholder="メッセージを入力"
+                    placeholder="Type a message"
                     value={messageDraft}
                     onChange={(event) => setMessageDraft(event.target.value)}
                     disabled={!activeConversation || sendMessageMutation.isPending}
@@ -806,17 +826,25 @@ export default function GuestDashboard() {
                     className="primary-btn chat-send-btn"
                     disabled={!canSendMessage}
                   >
-                    {sendMessageMutation.isPending ? "送信中..." : "送信"}
+                    {sendMessageMutation.isPending ? "Sending..." : "Send"}
                   </button>
                 </form>
               </>
             ) : (
               <div className="chat-empty-state">
-                マッチング済みの予約がチャットに表示されます。承認後にホストへ連絡しましょう。
+                Your matched bookings will appear here. Contact houses after approval.
               </div>
             )}
           </div>
         </div>
+      </section>
+
+      <section
+        className={activeTab === "payment" ? "tab-content active" : "tab-content"}
+        id="payment"
+      >
+        <div className="section-title">JPYC Payment</div>
+        <GuestPaymentPanel />
       </section>
     </PageLayout>
   );

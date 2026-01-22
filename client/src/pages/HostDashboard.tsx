@@ -16,9 +16,12 @@ import { useChatEvents } from "@/hooks/use-chat-events";
 import { useAuth } from "@/context/auth-context";
 import type { ChatMessage, ConversationSummary } from "@/types/chat";
 import { toast } from "@/hooks/use-toast";
+import { HostPaymentPanel } from "@/components/HostPaymentPanel";
+import { HostFeeSummary } from "@/components/HostFeeSummary";
+import "@/components/payment-panel.css";
 import "./host-dashboard.css";
 
-type TabKey = "profile" | "property" | "message";
+type TabKey = "profile" | "property" | "bookings" | "message" | "fees" | "payment";
 
 type HostProfileForm = {
   profilePhoto: string;
@@ -42,6 +45,7 @@ type HostPropertyForm = {
   capacity: string;
   amenities: string;
   photos: string[];
+  isPublished: boolean;
 };
 
 type HostProfileResponse = {
@@ -80,9 +84,22 @@ type HostPropertyResponse = {
   amenities: string | null;
   photos: string[] | null;
   availabilityDates: string[] | null;
+  isPublished: boolean;
   updatedAt: string;
 };
 
+type BookingRequestItem = {
+  id: string;
+  guestId: string;
+  hostId: string;
+  propertyId: string;
+  checkInDate: string;
+  checkOutDate: string;
+  totalAmount: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 type CalendarCell = {
   date: Date;
@@ -96,7 +113,10 @@ type CalendarCell = {
 const tabs: { id: TabKey; label: string }[] = [
   { id: "profile", label: "プロフィール入力" },
   { id: "property", label: "物件情報入力" },
+  { id: "bookings", label: "予約管理" },
   { id: "message", label: "メッセージ" },
+  { id: "fees", label: "手数料" },
+  { id: "payment", label: "JPYC決済" },
 ];
 
 const badgeOptions = [
@@ -196,6 +216,7 @@ export default function HostDashboard() {
     capacity: "",
     amenities: "",
     photos: [],
+    isPublished: false,
   });
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDates, setSelectedDates] = useState<Set<string>>(
@@ -241,6 +262,20 @@ export default function HostDashboard() {
     },
   });
 
+  const bookingRequestsKey = useMemo(() => ["bookingRequests", viewerId ?? "anon"], [viewerId]);
+  const {
+    data: bookingRequests = [],
+    isLoading: isBookingRequestsLoading,
+    refetch: refetchBookingRequests,
+  } = useQuery<BookingRequestItem[]>({
+    queryKey: bookingRequestsKey,
+    enabled: Boolean(viewerId),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/booking-requests");
+      return (await res.json()) as BookingRequestItem[];
+    },
+  });
+
   const accountPhotoKey = useMemo(() => ["accountProfilePhoto", viewerId ?? "anon"], [viewerId]);
   const { data: accountPhoto } = useQuery<{ profilePhoto: string | null } | null>({
     queryKey: accountPhotoKey,
@@ -279,6 +314,7 @@ export default function HostDashboard() {
       capacity: "",
       amenities: "",
       photos: [],
+      isPublished: false,
     });
     setSelectedDates(new Set<string>());
   }, [viewerId]);
@@ -379,6 +415,7 @@ export default function HostDashboard() {
         capacity: hostProperty.capacity?.toString() ?? "",
         amenities: hostProperty.amenities ?? "",
         photos: hostProperty.photos ?? [],
+        isPublished: hostProperty.isPublished ?? false,
       });
       setSelectedDates(new Set(hostProperty.availabilityDates ?? []));
       setIsPropertyEditing(false);
@@ -541,6 +578,78 @@ export default function HostDashboard() {
     },
   });
 
+  const approveBookingMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const res = await apiRequest("POST", `/api/booking-requests/${bookingId}/approve`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "予約リクエストを承認しました" });
+      refetchBookingRequests();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "承認に失敗しました",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const rejectBookingMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const res = await apiRequest("POST", `/api/booking-requests/${bookingId}/reject`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "予約リクエストを拒否しました" });
+      refetchBookingRequests();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "拒否に失敗しました",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const completeBookingMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const res = await apiRequest("POST", `/api/booking-requests/${bookingId}/complete`);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "宿泊完了", description: `${data.settlement?.hostAmount || ""}dJPYが入金されました` });
+      refetchBookingRequests();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "宿泊完了処理に失敗しました",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const cancelBookingMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const res = await apiRequest("POST", `/api/booking-requests/${bookingId}/cancel`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "予約をキャンセルしました", description: "50%が返金され、50%は手数料として徴収されます" });
+      refetchBookingRequests();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "キャンセルに失敗しました",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const canSendMessage = Boolean(activeThreadId && messageDraft.trim() && !sendMessageMutation.isPending);
 
   const handleSendMessage = async (event: FormEvent<HTMLFormElement>) => {
@@ -595,6 +704,7 @@ export default function HostDashboard() {
       amenities: propertyForm.amenities,
       photos: propertyForm.photos,
       availabilityDates: Array.from(selectedDates),
+      isPublished: propertyForm.isPublished,
     });
   };
 
@@ -1229,6 +1339,122 @@ export default function HostDashboard() {
             </small>
           </div>
         </div>
+
+        <div className={isPropertyEditing ? "profile-card" : "profile-card is-saved"}>
+          <h3 className="profile-card-title">公開設定</h3>
+          <div className="publish-toggle-wrap">
+            <label className="publish-toggle">
+              <input
+                type="checkbox"
+                checked={propertyForm.isPublished}
+                onChange={(event) => setPropertyForm((prev) => ({ ...prev, isPublished: event.target.checked }))}
+                disabled={!isPropertyEditing}
+              />
+              <span className="toggle-slider" />
+              <span className="toggle-label">
+                {propertyForm.isPublished ? "公開中" : "非公開"}
+              </span>
+            </label>
+            <p className="publish-hint">
+              {propertyForm.isPublished
+                ? "物件がゲストに公開されています。予約を受け付けることができます。"
+                : "物件は非公開です。ゲストには表示されません。"}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className={activeTab === "bookings" ? "tab-content active" : "tab-content"}
+        id="bookings"
+      >
+        <div className="section-title">予約管理</div>
+        <div className="bookings-section">
+          <p className="bookings-info">
+            ゲストからの予約リクエストがここに表示されます。承認すると決済が確定し、メッセージ機能が有効になります。
+          </p>
+
+          {isBookingRequestsLoading ? (
+            <div className="bookings-loading">読み込み中...</div>
+          ) : bookingRequests.length === 0 ? (
+            <div className="bookings-empty">
+              <p>現在、予約リクエストはありません。</p>
+            </div>
+          ) : (
+            <div className="bookings-list">
+              {bookingRequests.map((booking) => {
+                const checkIn = new Date(booking.checkInDate);
+                const checkOut = new Date(booking.checkOutDate);
+                const statusLabel =
+                  booking.status === "REQUESTED" ? "リクエスト中" :
+                  booking.status === "APPROVED" ? "承認済み" :
+                  booking.status === "REJECTED" ? "拒否済み" :
+                  booking.status === "COMPLETED" ? "完了" :
+                  booking.status === "CANCELLED" ? "キャンセル" : booking.status;
+                const statusClass =
+                  booking.status === "REQUESTED" ? "status-requested" :
+                  booking.status === "APPROVED" ? "status-approved" :
+                  booking.status === "REJECTED" ? "status-rejected" :
+                  booking.status === "COMPLETED" ? "status-completed" : "";
+
+                return (
+                  <div key={booking.id} className="booking-card">
+                    <div className="booking-header">
+                      <span className={`booking-status ${statusClass}`}>{statusLabel}</span>
+                      <span className="booking-date">
+                        {format(checkIn, "M月d日")} 〜 {format(checkOut, "M月d日")}
+                      </span>
+                    </div>
+                    <div className="booking-details">
+                      <p>合計金額: {parseFloat(booking.totalAmount).toLocaleString()} dJPY</p>
+                      <p>リクエスト日: {format(new Date(booking.createdAt), "yyyy年M月d日 HH:mm")}</p>
+                    </div>
+                    {booking.status === "REQUESTED" && (
+                      <div className="booking-actions">
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          onClick={() => approveBookingMutation.mutate(booking.id)}
+                          disabled={approveBookingMutation.isPending || rejectBookingMutation.isPending}
+                        >
+                          {approveBookingMutation.isPending ? "処理中..." : "承認する"}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => rejectBookingMutation.mutate(booking.id)}
+                          disabled={approveBookingMutation.isPending || rejectBookingMutation.isPending}
+                        >
+                          {rejectBookingMutation.isPending ? "処理中..." : "拒否する"}
+                        </button>
+                      </div>
+                    )}
+                    {booking.status === "APPROVED" && (
+                      <div className="booking-actions">
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          onClick={() => completeBookingMutation.mutate(booking.id)}
+                          disabled={completeBookingMutation.isPending || cancelBookingMutation.isPending}
+                        >
+                          {completeBookingMutation.isPending ? "処理中..." : "宿泊完了（入金）"}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn danger"
+                          onClick={() => cancelBookingMutation.mutate(booking.id)}
+                          disabled={completeBookingMutation.isPending || cancelBookingMutation.isPending}
+                        >
+                          {cancelBookingMutation.isPending ? "処理中..." : "キャンセル（50%返金）"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </section>
 
       <section
@@ -1331,6 +1557,22 @@ export default function HostDashboard() {
             )}
           </div>
         </div>
+      </section>
+
+      <section
+        className={activeTab === "fees" ? "tab-content active" : "tab-content"}
+        id="fees"
+      >
+        <div className="section-title">今月の手数料</div>
+        <HostFeeSummary />
+      </section>
+
+      <section
+        className={activeTab === "payment" ? "tab-content active" : "tab-content"}
+        id="payment"
+      >
+        <div className="section-title">JPYC決済</div>
+        <HostPaymentPanel />
       </section>
     </PageLayout>
   );

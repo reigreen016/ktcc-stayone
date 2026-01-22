@@ -29,6 +29,10 @@ import type {
   InsertHostProperty,
   GuestProfile,
   InsertGuestProfile,
+  TransactionLog,
+  InsertTransactionLog,
+  DemoState,
+  FlowMode,
 } from "@shared/schema";
 
 const pool = new pg.Pool({
@@ -60,6 +64,8 @@ export interface IStorage {
 
   getFeePaymentByBookingRequest(bookingRequestId: string): Promise<FeePayment | undefined>;
   getFeePaymentByTxHash(txHash: string): Promise<FeePayment | undefined>;
+  getFeePaymentsByHost(hostId: string): Promise<FeePayment[]>;
+  getAllPendingFeePayments(): Promise<FeePayment[]>;
   createFeePayment(feePayment: InsertFeePayment): Promise<FeePayment>;
   updateFeePaymentStatus(id: string, status: string, txHash?: string): Promise<FeePayment | undefined>;
 
@@ -86,6 +92,8 @@ export interface IStorage {
   upsertHostProfile(userId: string, profile: InsertHostProfile): Promise<HostProfile>;
   getHostPropertyByUserId(userId: string): Promise<HostProperty | undefined>;
   upsertHostProperty(userId: string, property: InsertHostProperty): Promise<HostProperty>;
+  getAllPublishedProperties(): Promise<(HostProperty & { host: User; hostProfile: HostProfile | null })[]>;
+  getHostPropertyById(id: string): Promise<(HostProperty & { host: User; hostProfile: HostProfile | null }) | undefined>;
   getGuestProfileByUserId(userId: string): Promise<GuestProfile | undefined>;
   upsertGuestProfile(userId: string, profile: InsertGuestProfile): Promise<GuestProfile>;
   getProfilePhotoByUserId(userId: string): Promise<string | null>;
@@ -251,6 +259,24 @@ export class DbStorage implements IStorage {
   async getFeePaymentByTxHash(txHash: string): Promise<FeePayment | undefined> {
     const result = await db.select().from(schema.feePayments).where(eq(schema.feePayments.txHash, txHash)).limit(1);
     return result[0];
+  }
+
+  async getFeePaymentsByHost(hostId: string): Promise<FeePayment[]> {
+    const rows = await db
+      .select({ feePayment: schema.feePayments })
+      .from(schema.feePayments)
+      .innerJoin(schema.bookingRequests, eq(schema.feePayments.bookingRequestId, schema.bookingRequests.id))
+      .where(eq(schema.bookingRequests.hostId, hostId))
+      .orderBy(desc(schema.feePayments.createdAt));
+    return rows.map((row) => row.feePayment);
+  }
+
+  async getAllPendingFeePayments(): Promise<FeePayment[]> {
+    return await db
+      .select()
+      .from(schema.feePayments)
+      .where(eq(schema.feePayments.status, "PENDING"))
+      .orderBy(desc(schema.feePayments.createdAt));
   }
 
   async createFeePayment(feePayment: InsertFeePayment): Promise<FeePayment> {
@@ -464,6 +490,42 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getAllPublishedProperties(): Promise<(HostProperty & { host: User; hostProfile: HostProfile | null })[]> {
+    // Get all properties that have a title set (indicating they've been saved)
+    const properties = await db
+      .select()
+      .from(schema.hostProperties);
+
+    const results = await Promise.all(
+      properties.map(async (property) => {
+        const host = await this.getUser(property.userId);
+        const hostProfile = await this.getHostProfileByUserId(property.userId);
+        return {
+          ...property,
+          host: host!,
+          hostProfile: hostProfile || null,
+        };
+      })
+    );
+
+    return results;
+  }
+
+  async getHostPropertyById(id: string): Promise<(HostProperty & { host: User; hostProfile: HostProfile | null }) | undefined> {
+    const result = await db.select().from(schema.hostProperties).where(eq(schema.hostProperties.id, id)).limit(1);
+    if (!result[0]) return undefined;
+
+    const property = result[0];
+    const host = await this.getUser(property.userId);
+    const hostProfile = await this.getHostProfileByUserId(property.userId);
+
+    return {
+      ...property,
+      host: host!,
+      hostProfile: hostProfile || null,
+    };
+  }
+
   async getGuestProfileByUserId(userId: string): Promise<GuestProfile | undefined> {
     const result = await db.select().from(schema.guestProfiles).where(eq(schema.guestProfiles.userId, userId)).limit(1);
     return result[0];
@@ -524,6 +586,53 @@ export class DbStorage implements IStorage {
 
   async transaction<T>(callback: (tx: any) => Promise<T>): Promise<T> {
     return await db.transaction(callback);
+  }
+
+  // Transaction logs for JPYC payments
+  async createTransactionLog(txLog: InsertTransactionLog): Promise<TransactionLog> {
+    const result = await db.insert(schema.transactionLogs).values(txLog).returning();
+    return result[0];
+  }
+
+  async getRecentTransactions(limit: number = 10): Promise<TransactionLog[]> {
+    return await db
+      .select()
+      .from(schema.transactionLogs)
+      .orderBy(desc(schema.transactionLogs.createdAt))
+      .limit(limit);
+  }
+
+  // Demo state / flow mode management
+  async getFlowMode(): Promise<FlowMode> {
+    const result = await db.select().from(schema.demoStates).limit(1);
+    if (result.length === 0) {
+      return "payment";
+    }
+    return (result[0].flowMode as FlowMode) || "payment";
+  }
+
+  async setFlowMode(mode: FlowMode): Promise<DemoState> {
+    const existing = await db.select().from(schema.demoStates).limit(1);
+    if (existing.length === 0) {
+      const result = await db.insert(schema.demoStates).values({ flowMode: mode }).returning();
+      return result[0];
+    }
+    const result = await db
+      .update(schema.demoStates)
+      .set({ flowMode: mode, updatedAt: new Date() })
+      .where(eq(schema.demoStates.id, existing[0].id))
+      .returning();
+    return result[0];
+  }
+
+  // Update user (for demo user upsert)
+  async updateUser(id: string, patch: Partial<{ username: string; role: string; walletAddress: string }>): Promise<User | undefined> {
+    const result = await db
+      .update(schema.users)
+      .set(patch)
+      .where(eq(schema.users.id, id))
+      .returning();
+    return result[0];
   }
 }
 

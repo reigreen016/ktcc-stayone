@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { authMiddleware, requireRole, hashPassword, verifyPassword, generateToken, verifyToken } from "./auth";
+import { tokenAdapter } from "./tokenAdapter";
 import {
   insertUserSchema,
   insertBookingRequestSchema,
@@ -298,7 +299,7 @@ export async function registerRoutes(
   app.post("/api/auth/register", async (req, res) => {
     try {
       const data = insertUserSchema.parse(req.body);
-      
+
       const existingUser = await storage.getUserByUsername(data.username);
       if (existingUser) {
         return res.status(400).json({ message: "ユーザー名は既に使用されています" });
@@ -346,7 +347,7 @@ export async function registerRoutes(
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      
+
       if (!username || !password) {
         return res.status(400).json({ message: "ユーザー名とパスワードが必要です" });
       }
@@ -553,13 +554,101 @@ export async function registerRoutes(
     }
   });
 
+  // Public properties API (no auth required for viewing)
+  app.get("/api/properties", async (_req, res) => {
+    try {
+      const properties = await storage.getAllPublishedProperties();
+      const response = properties.map((p) => ({
+        id: p.id,
+        title: p.title,
+        address: p.address,
+        nearestAccess: p.nearestAccess,
+        pricePerNight: p.pricePerNight,
+        capacity: p.capacity,
+        amenities: p.amenities,
+        photos: p.photos,
+        availabilityDates: p.availabilityDates,
+        host: {
+          id: p.host.id,
+          username: p.host.username,
+          profilePhoto: p.hostProfile?.profilePhoto || p.host.profilePhoto,
+          nickname: p.hostProfile?.nickname,
+          location: p.hostProfile?.location,
+          bio: p.hostProfile?.bio,
+          hostExperience: p.hostProfile?.hostExperience,
+          startYear: p.hostProfile?.startYear,
+          totalHosted: p.hostProfile?.totalHosted,
+          badges: p.hostProfile?.badges,
+          languages: p.hostProfile?.languages,
+          englishLevel: p.hostProfile?.englishLevel,
+          englishNote: p.hostProfile?.englishNote,
+        },
+      }));
+      return res.status(200).json(response);
+    } catch (error) {
+      console.error("Get properties error:", error);
+      return res.status(500).json({ message: "物件一覧の取得に失敗しました" });
+    }
+  });
+
+  app.get("/api/properties/:id", async (req, res) => {
+    try {
+      const property = await storage.getHostPropertyById(req.params.id);
+      if (!property) {
+        return res.status(404).json({ message: "物件が見つかりません" });
+      }
+      const response = {
+        id: property.id,
+        title: property.title,
+        address: property.address,
+        nearestAccess: property.nearestAccess,
+        pricePerNight: property.pricePerNight,
+        capacity: property.capacity,
+        amenities: property.amenities,
+        photos: property.photos,
+        availabilityDates: property.availabilityDates,
+        host: {
+          id: property.host.id,
+          username: property.host.username,
+          walletAddress: property.host.walletAddress,
+          profilePhoto: property.hostProfile?.profilePhoto || property.host.profilePhoto,
+          nickname: property.hostProfile?.nickname,
+          location: property.hostProfile?.location,
+          bio: property.hostProfile?.bio,
+          hostExperience: property.hostProfile?.hostExperience,
+          startYear: property.hostProfile?.startYear,
+          totalHosted: property.hostProfile?.totalHosted,
+          badges: property.hostProfile?.badges,
+          languages: property.hostProfile?.languages,
+          englishLevel: property.hostProfile?.englishLevel,
+          englishNote: property.hostProfile?.englishNote,
+        },
+      };
+      return res.status(200).json(response);
+    } catch (error) {
+      console.error("Get property error:", error);
+      return res.status(500).json({ message: "物件情報の取得に失敗しました" });
+    }
+  });
+
   app.post("/api/booking-requests", authMiddleware, requireRole("guest"), async (req, res) => {
     try {
-      const data = insertBookingRequestSchema.parse(req.body);
-      
+      // Convert date strings to Date objects
+      const bodyWithDates = {
+        ...req.body,
+        checkInDate: req.body.checkInDate ? new Date(req.body.checkInDate) : undefined,
+        checkOutDate: req.body.checkOutDate ? new Date(req.body.checkOutDate) : undefined,
+      };
+      const data = insertBookingRequestSchema.parse(bodyWithDates);
+
       const host = await storage.getUser(data.hostId);
       if (!host || host.role !== "host") {
         return res.status(400).json({ message: "ホストが見つかりません" });
+      }
+
+      const guest = await storage.getUser(req.user!.userId);
+      if (!guest) {
+        return res.status(400).json({ message: "ゲスト情報が見つかりません" });
       }
 
       const bookingRequest = await storage.createBookingRequest({
@@ -583,7 +672,7 @@ export async function registerRoutes(
     try {
       const { id } = req.params;
       const bookingRequest = await storage.getBookingRequest(id);
-      
+
       if (!bookingRequest) {
         return res.status(404).json({ message: "予約リクエストが見つかりません" });
       }
@@ -594,6 +683,43 @@ export async function registerRoutes(
 
       if (bookingRequest.status !== "REQUESTED") {
         return res.status(400).json({ message: "承認できるのは REQUESTED 状態のリクエストのみです" });
+      }
+
+      const existingPayment = await storage.getPaymentByBookingRequest(id);
+      if (existingPayment && existingPayment.status !== "ESCROW") {
+        return res.status(400).json({ message: "この予約の決済状態が不正です" });
+      }
+
+      const guest = await storage.getUser(bookingRequest.guestId);
+      if (!guest) {
+        return res.status(400).json({ message: "ゲスト情報が見つかりません" });
+      }
+
+      const escrowWallet = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
+      if (!existingPayment) {
+        const escrowResult = await tokenAdapter.transfer(
+          guest.walletAddress,
+          escrowWallet,
+          bookingRequest.totalAmount.toString()
+        );
+
+        if (!escrowResult.success) {
+          return res.status(400).json({
+            message: "JPYC決済に失敗しました",
+            detail: escrowResult.message,
+          });
+        }
+
+        const payment = await storage.createPayment({
+          bookingRequestId: bookingRequest.id,
+          fromWallet: guest.walletAddress,
+          toWallet: escrowWallet,
+          amount: bookingRequest.totalAmount.toString(),
+          txHash: escrowResult.txHash || null,
+          status: "ESCROW",
+        });
+
+        await logAudit("payment", payment.id, "ESCROWED", req.user!.userId, null, payment, escrowResult.txHash);
       }
 
       const previousState = { ...bookingRequest };
@@ -620,7 +746,7 @@ export async function registerRoutes(
     try {
       const { id } = req.params;
       const bookingRequest = await storage.getBookingRequest(id);
-      
+
       if (!bookingRequest) {
         return res.status(404).json({ message: "予約リクエストが見つかりません" });
       }
@@ -638,10 +764,337 @@ export async function registerRoutes(
 
       await logAudit("booking_request", id, "REJECTED", req.user!.userId, previousState, updatedBooking);
 
+      // Refund the escrowed JPYC back to guest
+      const payment = await storage.getPaymentByBookingRequest(id);
+      if (payment && payment.status === "ESCROW") {
+        const booking = await storage.getBookingRequest(id);
+        if (booking) {
+          const guest = await storage.getUser(booking.guestId);
+          if (guest) {
+            const escrowWallet = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
+            const refundResult = await tokenAdapter.transfer(
+              escrowWallet,
+              guest.walletAddress,
+              payment.amount.toString()
+            );
+            if (refundResult.success) {
+              await storage.updatePaymentStatus(payment.id, "REFUNDED", refundResult.txHash);
+            }
+          }
+        }
+      }
+
       return res.status(200).json(updatedBooking);
     } catch (error) {
       console.error("Booking rejection error:", error);
       return res.status(500).json({ message: "予約の拒否に失敗しました" });
+    }
+  });
+
+  // Complete stay - transfer JPYC from escrow to host (100%), fee billed monthly (15%)
+  app.post("/api/booking-requests/:id/complete", authMiddleware, requireRole("host"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const bookingRequest = await storage.getBookingRequest(id);
+
+      if (!bookingRequest) {
+        return res.status(404).json({ message: "予約リクエストが見つかりません" });
+      }
+
+      if (bookingRequest.hostId !== req.user!.userId) {
+        return res.status(403).json({ message: "この予約を完了する権限がありません" });
+      }
+
+      if (bookingRequest.status !== "APPROVED") {
+        return res.status(400).json({ message: "完了できるのは APPROVED 状態のリクエストのみです" });
+      }
+
+      const payment = await storage.getPaymentByBookingRequest(id);
+      if (!payment || payment.status !== "ESCROW") {
+        return res.status(400).json({ message: "有効な決済情報が見つかりません" });
+      }
+
+      const host = await storage.getUser(bookingRequest.hostId);
+      if (!host) {
+        return res.status(400).json({ message: "ホスト情報が見つかりません" });
+      }
+
+      const escrowWallet = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
+      const totalAmount = parseFloat(payment.amount.toString());
+      const feeRate = 0.15;
+      const feeAmount = parseFloat((totalAmount * feeRate).toFixed(2));
+
+      // Transfer 100% to host after stay completion
+      const hostTransfer = await tokenAdapter.transfer(
+        escrowWallet,
+        host.walletAddress,
+        totalAmount.toString()
+      );
+
+      if (!hostTransfer.success) {
+        return res.status(500).json({ message: "ホストへの送金に失敗しました", detail: hostTransfer.message });
+      }
+
+      // Record monthly fee (host pays later)
+      const operatorWallet = tokenAdapter.getAccountByName("operator")?.address || escrowWallet;
+      const feePayment = await storage.createFeePayment({
+        bookingRequestId: id,
+        fromWallet: host.walletAddress,
+        toWallet: operatorWallet,
+        amount: feeAmount.toFixed(2),
+        feeRate: feeRate.toString(),
+        txHash: null,
+        status: "PENDING",
+      });
+
+      // Update payment status
+      await storage.updatePaymentStatus(payment.id, "COMPLETED", hostTransfer.txHash);
+
+      // Update booking status to COMPLETED
+      const previousState = { ...bookingRequest };
+      const updatedBooking = await storage.updateBookingRequestStatus(id, "COMPLETED");
+
+      await logAudit("booking_request", id, "COMPLETED", req.user!.userId, previousState, {
+        booking: updatedBooking,
+        hostAmount: totalAmount,
+        feeAmount,
+        txHash: hostTransfer.txHash,
+        feePaymentId: feePayment.id,
+      });
+
+      return res.status(200).json({
+        ...updatedBooking,
+        settlement: {
+          hostAmount: totalAmount,
+          feeAmount,
+          txHash: hostTransfer.txHash,
+        },
+      });
+    } catch (error) {
+      console.error("Booking completion error:", error);
+      return res.status(500).json({ message: "宿泊完了処理に失敗しました" });
+    }
+  });
+
+  // Cancel booking - refund JPYC from escrow to guest
+  app.post("/api/booking-requests/:id/cancel", authMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const bookingRequest = await storage.getBookingRequest(id);
+
+      if (!bookingRequest) {
+        return res.status(404).json({ message: "予約リクエストが見つかりません" });
+      }
+
+      // Both host and guest can cancel
+      const isHost = bookingRequest.hostId === req.user!.userId;
+      const isGuest = bookingRequest.guestId === req.user!.userId;
+      if (!isHost && !isGuest) {
+        return res.status(403).json({ message: "この予約をキャンセルする権限がありません" });
+      }
+
+      if (bookingRequest.status === "COMPLETED" || bookingRequest.status === "CANCELLED") {
+        return res.status(400).json({ message: "既に完了またはキャンセルされた予約です" });
+      }
+
+      const payment = await storage.getPaymentByBookingRequest(id);
+      if (payment && payment.status === "ESCROW") {
+        const guest = await storage.getUser(bookingRequest.guestId);
+        if (guest) {
+          const escrowWallet = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
+          // キャンセル時は50%手数料、50%返金
+          const cancelFeeRate = 0.5;
+          const totalAmount = parseFloat(payment.amount.toString());
+          const refundAmount = parseFloat((totalAmount * (1 - cancelFeeRate)).toFixed(2));
+          const operatorFeeAmount = parseFloat((totalAmount * cancelFeeRate).toFixed(2));
+
+          // 50%をゲストに返金
+          const refundResult = await tokenAdapter.transfer(
+            escrowWallet,
+            guest.walletAddress,
+            refundAmount.toString()
+          );
+
+          if (refundResult.success) {
+            // 50%を運営に送金
+            const operatorWallet = tokenAdapter.getAccountByName("operator")?.address || escrowWallet;
+            const operatorTransfer = await tokenAdapter.transfer(
+              escrowWallet,
+              operatorWallet,
+              operatorFeeAmount.toString()
+            );
+
+            await storage.updatePaymentStatus(payment.id, "REFUNDED", refundResult.txHash);
+
+            // Record refund
+            const faultType = isHost ? "host_fault" : "guest_fault";
+            await storage.createRefund({
+              bookingRequestId: id,
+              faultType,
+              fromWallet: escrowWallet,
+              toWallet: guest.walletAddress,
+              amount: refundAmount.toString(),
+              refundRate: (1 - cancelFeeRate).toFixed(4),
+              txHash: refundResult.txHash || null,
+              status: "COMPLETED",
+            });
+
+            await logAudit("cancel_fee", id, "CHARGED", req.user!.userId, null, {
+              cancelFeeRate,
+              cancelFeeAmount: operatorFeeAmount,
+              operatorTxHash: operatorTransfer.txHash,
+            });
+          }
+        }
+      }
+
+      const previousState = { ...bookingRequest };
+      const updatedBooking = await storage.updateBookingRequestStatus(id, "CANCELLED");
+
+      await logAudit("booking_request", id, "CANCELLED", req.user!.userId, previousState, updatedBooking);
+
+      return res.status(200).json(updatedBooking);
+    } catch (error) {
+      console.error("Booking cancellation error:", error);
+      return res.status(500).json({ message: "予約のキャンセルに失敗しました" });
+    }
+  });
+
+  app.get("/api/host/fees/summary", authMiddleware, requireRole("host"), async (req, res) => {
+    try {
+      const hostId = req.user!.userId;
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const feePayments = await storage.getFeePaymentsByHost(hostId);
+      const pending = feePayments.filter((fee) => fee.status === "PENDING");
+      const pendingTotal = pending.reduce((sum, fee) => sum + parseFloat(fee.amount.toString()), 0);
+      const currentMonthTotal = pending
+        .filter((fee) => {
+          const createdAt = new Date(fee.createdAt);
+          return createdAt >= monthStart && createdAt < nextMonthStart;
+        })
+        .reduce((sum, fee) => sum + parseFloat(fee.amount.toString()), 0);
+
+      return res.status(200).json({
+        feeRate: 0.15,
+        pendingCount: pending.length,
+        pendingTotal: pendingTotal.toFixed(2),
+        currentMonthTotal: currentMonthTotal.toFixed(2),
+        currentMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+        dueDate: monthEnd.toISOString(),
+      });
+    } catch (error) {
+      console.error("Host fee summary error:", error);
+      return res.status(500).json({ message: "手数料サマリーの取得に失敗しました" });
+    }
+  });
+
+  app.post("/api/host/fees/settle", authMiddleware, requireRole("host"), async (req, res) => {
+    try {
+      const hostId = req.user!.userId;
+      const host = await storage.getUser(hostId);
+      if (!host) {
+        return res.status(400).json({ message: "ホスト情報が見つかりません" });
+      }
+
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const feePayments = await storage.getFeePaymentsByHost(hostId);
+      const dueFees = feePayments.filter((fee) => {
+        if (fee.status !== "PENDING") return false;
+        const createdAt = new Date(fee.createdAt);
+        return createdAt >= monthStart && createdAt < nextMonthStart;
+      });
+
+      if (dueFees.length === 0) {
+        return res.status(400).json({ message: "今月の手数料はありません" });
+      }
+
+      const totalAmount = dueFees.reduce((sum, fee) => sum + parseFloat(fee.amount.toString()), 0);
+      const operatorWallet = tokenAdapter.getAccountByName("operator")?.address;
+      if (!operatorWallet) {
+        return res.status(500).json({ message: "運営ウォレットが見つかりません" });
+      }
+
+      const tx = await tokenAdapter.transfer(host.walletAddress, operatorWallet, totalAmount.toFixed(2));
+      if (!tx.success) {
+        return res.status(400).json({ message: tx.message || "手数料送金に失敗しました" });
+      }
+
+      for (const fee of dueFees) {
+        const previousState = { ...fee };
+        const updated = await storage.updateFeePaymentStatus(fee.id, "COMPLETED", tx.txHash);
+        await logAudit("fee_payment", fee.id, "COMPLETED", req.user!.userId, previousState, updated, tx.txHash);
+      }
+
+      return res.status(200).json({
+        success: true,
+        txHash: tx.txHash,
+        amount: totalAmount.toFixed(2),
+        count: dueFees.length,
+      });
+    } catch (error) {
+      console.error("Host fee settlement error:", error);
+      return res.status(500).json({ message: "手数料支払いに失敗しました" });
+    }
+  });
+
+  // Admin endpoint for automatic monthly fee settlement (can be triggered by cron)
+  app.post("/api/admin/fees/auto-settle", authMiddleware, requireRole("operator"), async (req, res) => {
+    try {
+      const operatorWallet = tokenAdapter.getAccountByName("operator")?.address;
+      if (!operatorWallet) {
+        return res.status(500).json({ message: "運営ウォレットが見つかりません" });
+      }
+
+      const allPendingFees = await storage.getAllPendingFeePayments();
+      if (allPendingFees.length === 0) {
+        return res.status(200).json({ success: true, message: "精算対象の手数料はありません", settlements: [] });
+      }
+
+      // Group fees by host
+      const feesByHost = new Map<string, typeof allPendingFees>();
+      for (const fee of allPendingFees) {
+        const hostId = fee.fromWallet; // fromWallet is the host's wallet
+        const existing = feesByHost.get(hostId) || [];
+        existing.push(fee);
+        feesByHost.set(hostId, existing);
+      }
+
+      const settlements: { hostWallet: string; amount: string; txHash: string | null; success: boolean }[] = [];
+
+      for (const [hostWallet, fees] of feesByHost) {
+        const totalAmount = fees.reduce((sum, fee) => sum + parseFloat(fee.amount.toString()), 0);
+
+        const tx = await tokenAdapter.transfer(hostWallet, operatorWallet, totalAmount.toFixed(2));
+
+        if (tx.success) {
+          for (const fee of fees) {
+            await storage.updateFeePaymentStatus(fee.id, "COMPLETED", tx.txHash);
+            await logAudit("fee_payment", fee.id, "AUTO_SETTLED", req.user!.userId, null, { txHash: tx.txHash });
+          }
+        }
+
+        settlements.push({
+          hostWallet,
+          amount: totalAmount.toFixed(2),
+          txHash: tx.txHash || null,
+          success: tx.success,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `${settlements.filter(s => s.success).length}件のホストの手数料を自動精算しました`,
+        settlements,
+      });
+    } catch (error) {
+      console.error("Auto fee settlement error:", error);
+      return res.status(500).json({ message: "自動精算に失敗しました" });
     }
   });
 
@@ -760,7 +1213,7 @@ export async function registerRoutes(
   app.post("/api/payments/prepare", authMiddleware, requireRole("guest"), async (req, res) => {
     try {
       const { bookingRequestId } = req.body;
-      
+
       if (!bookingRequestId) {
         return res.status(400).json({ message: "bookingRequestId が必要です" });
       }
@@ -817,7 +1270,7 @@ export async function registerRoutes(
   app.post("/api/webhooks/jpyc/payment-completed", async (req, res) => {
     try {
       const { txHash, paymentId } = req.body;
-      
+
       if (!txHash || !paymentId) {
         return res.status(400).json({ message: "txHash と paymentId が必要です" });
       }
@@ -862,7 +1315,7 @@ export async function registerRoutes(
   app.post("/api/stays/:bookingRequestId/complete", authMiddleware, requireRole("guest", "host"), async (req, res) => {
     try {
       const { bookingRequestId } = req.params;
-      
+
       const bookingRequest = await storage.getBookingRequest(bookingRequestId);
       if (!bookingRequest) {
         return res.status(404).json({ message: "予約が見つかりません" });
@@ -932,7 +1385,7 @@ export async function registerRoutes(
   app.post("/api/webhooks/jpyc/fee-completed", async (req, res) => {
     try {
       const { txHash, feePaymentId } = req.body;
-      
+
       if (!txHash || !feePaymentId) {
         return res.status(400).json({ message: "txHash と feePaymentId が必要です" });
       }
@@ -966,7 +1419,7 @@ export async function registerRoutes(
   app.post("/api/refunds", authMiddleware, requireRole("guest", "host"), async (req, res) => {
     try {
       const { bookingRequestId, faultType } = req.body;
-      
+
       if (!bookingRequestId || !faultType) {
         return res.status(400).json({ message: "bookingRequestId と faultType が必要です" });
       }
@@ -1028,7 +1481,7 @@ export async function registerRoutes(
   app.post("/api/webhooks/jpyc/refund-completed", async (req, res) => {
     try {
       const { txHash, refundId } = req.body;
-      
+
       if (!txHash || !refundId) {
         return res.status(400).json({ message: "txHash と refundId が必要です" });
       }
@@ -1040,7 +1493,7 @@ export async function registerRoutes(
 
       const refunds = await storage.getRefundsByBookingRequest(refundId);
       const refund = refunds.find(r => r.id === refundId);
-      
+
       if (!refund) {
         return res.status(404).json({ message: "返金が見つかりません" });
       }
@@ -1064,7 +1517,7 @@ export async function registerRoutes(
   app.post("/api/policies", authMiddleware, requireRole("operator"), async (req, res) => {
     try {
       const data = insertPolicySchema.parse(req.body);
-      
+
       const existingPolicy = await storage.getPolicyByName(data.name);
       if (existingPolicy) {
         const updated = await storage.updatePolicy(data.name, data.config);
@@ -1087,13 +1540,16 @@ export async function registerRoutes(
 
   app.get("/api/booking-requests", authMiddleware, async (req, res) => {
     try {
+      // Use preferredRole to determine if user is host or guest
+      const preferredRole = await storage.getUserPreferredRole(req.user!.userId);
+
       let bookings;
-      if (req.user!.role === "guest") {
+      if (preferredRole === "guest") {
         bookings = await storage.getBookingRequestsByGuest(req.user!.userId);
-      } else if (req.user!.role === "host") {
+      } else if (preferredRole === "host") {
         bookings = await storage.getBookingRequestsByHost(req.user!.userId);
       } else {
-        return res.status(403).json({ message: "権限がありません" });
+        return res.status(403).json({ message: "利用モードを設定してください" });
       }
 
       return res.status(200).json(bookings);
@@ -1111,6 +1567,248 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Get audit logs error:", error);
       return res.status(500).json({ message: "監査ログの取得に失敗しました" });
+    }
+  });
+
+  // -------------------------
+  // JPYC Token API
+  // -------------------------
+  tokenAdapter.initialize().catch(console.error);
+
+  app.get("/api/token/accounts", async (_req, res) => {
+    try {
+      if (!tokenAdapter.isInitialized()) {
+        await tokenAdapter.initialize();
+      }
+      const accounts = await tokenAdapter.getAccounts();
+      return res.status(200).json({
+        accounts,
+        contractAddress: tokenAdapter.getContractAddress(),
+      });
+    } catch (error) {
+      console.error("Get accounts error:", error);
+      return res.status(500).json({ accounts: [], contractAddress: "" });
+    }
+  });
+
+  app.get("/api/token/balance", async (req, res) => {
+    try {
+      const address = req.query.address as string;
+      if (!address) {
+        return res.status(400).json({ success: false, message: "address query parameter required" });
+      }
+      if (!tokenAdapter.isInitialized()) {
+        await tokenAdapter.initialize();
+      }
+      const balance = await tokenAdapter.getBalance(address);
+      return res.status(200).json({
+        success: true,
+        address,
+        balance,
+        contractAddress: tokenAdapter.getContractAddress(),
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post("/api/token/mint", async (req, res) => {
+    try {
+      const { to, amount } = req.body;
+      if (!to || !amount) {
+        return res.status(400).json({ success: false, message: "to と amount が必要です" });
+      }
+      const result = await tokenAdapter.mint(to, amount);
+
+      if (result.success && result.receipt) {
+        // DB書き込みは失敗してもミント自体は成功
+        try {
+          await storage.createTransactionLog({
+            type: "mint",
+            fromWallet: "0x0000000000000000000000000000000000000000",
+            toWallet: to,
+            amount: amount,
+            txHash: result.txHash!,
+            blockNumber: result.receipt.blockNumber,
+            gasUsed: result.receipt.gasUsed,
+            status: result.receipt.status,
+          });
+        } catch (dbError) {
+          console.warn("[TokenAPI] Failed to log transaction to DB:", dbError);
+        }
+      }
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error: any) {
+      console.error("[TokenAPI] Mint error:", error);
+      return res.status(500).json({ success: false, message: error.message || "Unknown error" });
+    }
+  });
+
+  app.post("/api/token/transfer", async (req, res) => {
+    try {
+      const { from, to, amount } = req.body;
+      if (!from || !to || !amount) {
+        return res.status(400).json({ success: false, message: "from, to, amount が必要です" });
+      }
+      const result = await tokenAdapter.transfer(from, to, amount);
+
+      if (result.success && result.receipt) {
+        try {
+          await storage.createTransactionLog({
+            type: "transfer",
+            fromWallet: from,
+            toWallet: to,
+            amount: amount,
+            txHash: result.txHash!,
+            blockNumber: result.receipt.blockNumber,
+            gasUsed: result.receipt.gasUsed,
+            status: result.receipt.status,
+          });
+        } catch (dbError) {
+          console.warn("[TokenAPI] Failed to log transaction to DB:", dbError);
+        }
+      }
+
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error: any) {
+      console.error("[TokenAPI] Transfer error:", error);
+      return res.status(500).json({ success: false, message: error.message || "Unknown error" });
+    }
+  });
+
+  app.get("/api/token/transactions", async (_req, res) => {
+    try {
+      const transactions = await storage.getRecentTransactions(10);
+      return res.status(200).json({ success: true, transactions });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message, transactions: [] });
+    }
+  });
+
+  // Demo/Flow mode API
+  app.get("/api/demo/status", async (_req, res) => {
+    try {
+      const flowMode = await storage.getFlowMode();
+      return res.status(200).json({ success: true, flowMode });
+    } catch (error: any) {
+      return res.status(200).json({ success: true, flowMode: "payment" });
+    }
+  });
+
+  const flowModeBodySchema = z.object({
+    flowMode: z.enum(["payment", "refund_host_fault", "refund_guest_fault"]),
+  });
+
+  app.post("/api/demo/flow-mode", async (req, res) => {
+    try {
+      const { flowMode } = flowModeBodySchema.parse(req.body);
+      const state = await storage.setFlowMode(flowMode);
+      return res.status(200).json({ success: true, flowMode: state.flowMode });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: "Invalid flow mode", errors: error.errors });
+      }
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Payment execution API
+  const FEE_RATE = 0.15;
+  const REFUND_RATE = 0.5;
+
+  const paymentExecuteSchema = z.object({
+    bookingRequestId: z.string().min(1),
+  });
+
+  app.post("/api/payments/execute", authMiddleware, async (req, res) => {
+    try {
+      const { bookingRequestId } = paymentExecuteSchema.parse(req.body);
+
+      const booking = await storage.getBookingRequest(bookingRequestId);
+      if (!booking) {
+        return res.status(404).json({ success: false, message: "予約が見つかりません" });
+      }
+
+      if (booking.guestId !== req.user!.userId) {
+        return res.status(403).json({ success: false, message: "この予約の決済権限がありません" });
+      }
+
+      if (booking.status !== "APPROVED") {
+        return res.status(400).json({ success: false, message: "承認済みの予約のみ決済できます" });
+      }
+
+      // Check for existing payment (idempotency)
+      const existingPayment = await storage.getPaymentByBookingRequest(bookingRequestId);
+      if (existingPayment && existingPayment.status === "COMPLETED") {
+        return res.status(409).json({ success: false, message: "この予約は既に決済済みです" });
+      }
+
+      const guest = await storage.getUser(booking.guestId);
+      const host = await storage.getUser(booking.hostId);
+      if (!guest || !host) {
+        return res.status(500).json({ success: false, message: "ユーザー情報の取得に失敗しました" });
+      }
+
+      const amount = String(booking.totalAmount);
+
+      // Execute transfer
+      const tx = await tokenAdapter.transfer(guest.walletAddress, host.walletAddress, amount);
+      if (!tx.success) {
+        return res.status(400).json({ success: false, message: tx.message || "決済に失敗しました" });
+      }
+
+      // Create/update payment record
+      let payment = existingPayment;
+      if (!payment) {
+        payment = await storage.createPayment({
+          bookingRequestId,
+          fromWallet: guest.walletAddress,
+          toWallet: host.walletAddress,
+          amount: amount,
+          status: "COMPLETED",
+          txHash: tx.txHash || null,
+        });
+      } else {
+        payment = await storage.updatePaymentStatus(payment.id, "COMPLETED", tx.txHash);
+      }
+
+      // Update booking status
+      await storage.updateBookingRequestStatus(bookingRequestId, "PREPAID");
+
+      // Log transaction
+      if (tx.receipt) {
+        await storage.createTransactionLog({
+          type: "payment",
+          fromWallet: guest.walletAddress,
+          toWallet: host.walletAddress,
+          amount: amount,
+          txHash: tx.txHash!,
+          blockNumber: tx.receipt.blockNumber,
+          gasUsed: tx.receipt.gasUsed,
+          status: tx.receipt.status,
+        });
+      }
+
+      await logAudit("payment", bookingRequestId, "PAYMENT_COMPLETED", req.user!.userId, null, {
+        txHash: tx.txHash,
+        amount,
+        from: guest.walletAddress,
+        to: host.walletAddress,
+      }, tx.txHash);
+
+      return res.status(200).json({
+        success: true,
+        txHash: tx.txHash,
+        message: `決済完了（Guest → Host） ${amount} dJPY`,
+        payment,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: "入力が不正です", errors: error.errors });
+      }
+      console.error("Payment execute error:", error);
+      return res.status(500).json({ success: false, message: error.message || "internal error" });
     }
   });
 

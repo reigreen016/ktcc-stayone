@@ -20,7 +20,7 @@ export function DemoAuthGate({ children }: DemoAuthGateProps) {
   const [location, setLocation] = useLocation();
   const [token, setTokenState] = useState<string | null>(() => getAuthToken());
   const [user, setUser] = useState<AuthTokenPayload | null>(() => decodeAuthToken(getAuthToken()));
-  const publicPaths = useMemo(() => new Set(["/auth", "/signup", "/login", "/host/signup", "/guest/signup"]), []);
+  const publicPaths = useMemo(() => new Set(["/auth", "/signup", "/login", "/host/signup", "/guest/signup", "/admin/payment"]), []);
   const isPublicRoute = publicPaths.has(location);
   const prevTokenRef = useRef<string | null>(token);
 

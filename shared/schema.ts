@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -52,6 +52,7 @@ export const hostProperties = pgTable("host_properties", {
   amenities: text("amenities"),
   photos: jsonb("photos"),
   availabilityDates: jsonb("availability_dates"),
+  isPublished: boolean("is_published").default(false).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -99,11 +100,12 @@ export const bookingRequests = pgTable("booking_requests", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertBookingRequestSchema = createInsertSchema(bookingRequests).omit({ 
-  id: true, 
-  createdAt: true, 
+export const insertBookingRequestSchema = createInsertSchema(bookingRequests).omit({
+  id: true,
+  guestId: true,
+  createdAt: true,
   updatedAt: true,
-  status: true 
+  status: true
 });
 export type InsertBookingRequest = z.infer<typeof insertBookingRequestSchema>;
 export type BookingRequest = typeof bookingRequests.$inferSelect;
@@ -120,10 +122,10 @@ export const payments = pgTable("payments", {
   completedAt: timestamp("completed_at"),
 });
 
-export const insertPaymentSchema = createInsertSchema(payments).omit({ 
-  id: true, 
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
   createdAt: true,
-  completedAt: true 
+  completedAt: true
 });
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
@@ -141,10 +143,10 @@ export const feePayments = pgTable("fee_payments", {
   completedAt: timestamp("completed_at"),
 });
 
-export const insertFeePaymentSchema = createInsertSchema(feePayments).omit({ 
-  id: true, 
+export const insertFeePaymentSchema = createInsertSchema(feePayments).omit({
+  id: true,
   createdAt: true,
-  completedAt: true 
+  completedAt: true
 });
 export type InsertFeePayment = z.infer<typeof insertFeePaymentSchema>;
 export type FeePayment = typeof feePayments.$inferSelect;
@@ -163,10 +165,10 @@ export const refunds = pgTable("refunds", {
   completedAt: timestamp("completed_at"),
 });
 
-export const insertRefundSchema = createInsertSchema(refunds).omit({ 
-  id: true, 
+export const insertRefundSchema = createInsertSchema(refunds).omit({
+  id: true,
   createdAt: true,
-  completedAt: true 
+  completedAt: true
 });
 export type InsertRefund = z.infer<typeof insertRefundSchema>;
 export type Refund = typeof refunds.$inferSelect;
@@ -179,9 +181,9 @@ export const stayStatuses = pgTable("stay_statuses", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertStayStatusSchema = createInsertSchema(stayStatuses).omit({ 
-  id: true, 
-  createdAt: true 
+export const insertStayStatusSchema = createInsertSchema(stayStatuses).omit({
+  id: true,
+  createdAt: true
 });
 export type InsertStayStatus = z.infer<typeof insertStayStatusSchema>;
 export type StayStatus = typeof stayStatuses.$inferSelect;
@@ -228,10 +230,10 @@ export const policies = pgTable("policies", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertPolicySchema = createInsertSchema(policies).omit({ 
-  id: true, 
-  createdAt: true, 
-  updatedAt: true 
+export const insertPolicySchema = createInsertSchema(policies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 });
 export type InsertPolicy = z.infer<typeof insertPolicySchema>;
 export type Policy = typeof policies.$inferSelect;
@@ -249,9 +251,42 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ 
-  id: true, 
-  createdAt: true 
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true
 });
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+// Transaction logs for JPYC payments
+export const transactionLogs = pgTable("transaction_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(),
+  fromWallet: text("from_wallet").notNull(),
+  toWallet: text("to_wallet").notNull(),
+  amount: text("amount").notNull(),
+  txHash: text("tx_hash").notNull(),
+  blockNumber: integer("block_number"),
+  gasUsed: text("gas_used"),
+  status: integer("status"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTransactionLogSchema = createInsertSchema(transactionLogs).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertTransactionLog = z.infer<typeof insertTransactionLogSchema>;
+export type TransactionLog = typeof transactionLogs.$inferSelect;
+
+// Flow mode for demo/testing
+export const flowModeEnum = z.enum(["payment", "refund_host_fault", "refund_guest_fault"]);
+export type FlowMode = z.infer<typeof flowModeEnum>;
+
+export const demoStates = pgTable("demo_states", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  flowMode: text("flow_mode").notNull().default("payment"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type DemoState = typeof demoStates.$inferSelect;
